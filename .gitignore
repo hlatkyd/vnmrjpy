@@ -1,0 +1,5 @@
+# ignore test data
+
+dataset/*
+lib/*
+bin/*

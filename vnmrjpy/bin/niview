@@ -1,0 +1,100 @@
+#!/usr/bin/python3
+
+import os
+import matplotlib.pyplot as plt
+import numpy as np
+import nibabel as nib
+from argparse import ArgumentParser
+from readfdf import fdfReader
+from writenifti import niftiWriter
+"""
+Program to plot all slices of nifti simultaneously
+"""
+class niview():
+
+    def __init__(self, nifti=None, axis=2, img=None):
+
+        if nifti is not None:
+            self.img = nib.load(nifti)
+            self.data = self.img.get_fdata()
+            self.axis = axis
+            self.affine = self.img.affine
+            print('input nifti shape: {}'.format(self.data.shape))
+
+        elif img is not None:
+
+            fdfrdr = fdfReader(img)
+            (hdr, data) = fdfrdr.read() 
+            procpar = fdfrdr.procpar
+            nwr = niftiWriter(procpar, data)
+            self.affine = nwr.aff
+            self.data = data
+            print('input img shape: {}'.format(self.data.shape))
+                
+        else:
+
+            print('Possibly wrong input. Quitting ...')
+            return
+        #finding dimension with 1 length
+
+    def quickplot(self):
+        """
+        This is for fast non-interactive plotting.
+        BETA USE ONLY
+        """
+        x_axis = 0 # TODO: make this dynamic
+        y_axis = 1
+        x_len = self.data.shape[x_axis]
+        y_len = self.data.shape[y_axis]
+        ncols = int(self.data.shape[self.axis] // \
+                np.sqrt(self.data.shape[self.axis]))
+        if np.sqrt(self.data.shape[self.axis]).is_integer():
+            nrows = int(ncols)
+
+        else:
+            nrows = int(ncols) + 1
+
+        img = np.zeros([self.data.shape[x_axis]*ncols,\
+                        self.data.shape[y_axis]*nrows])
+
+        # arranging the slices
+        for i in range(nrows):
+            for j in range(ncols):
+                try:
+                    img[i*x_len:(1+i)*x_len,j*y_len:(j+1)*y_len] = \
+                    self.data[:,:,i*ncols+j,0]
+                except:
+                    pass
+
+        plt.figure(figsize=(15,10))
+        plt.imshow(img, cmap='gray')
+        plt.tight_layout()
+        plt.show()
+
+    def interactiveplot(self):
+        """
+        Using nibabel built-in viewer
+        """
+        v = nib.viewers.OrthoSlicer3D(self.data, affine=self.affine)
+        v.show()
+
+if __name__ == '__main__':
+
+    parser = ArgumentParser()
+    parser.add_argument('nifti')
+    args = parser.parse_args()
+    if str(args.nifti).endswith('.nii') or \
+        str(args.nifti).endswith('.nii.gz'):
+  
+        nv = niview(nifti=str(args.nifti))
+        nv.interactiveplot()
+
+    elif str(args.nifti).endswith('.img') and \
+        os.path.isdir(str(args.nifti)):
+    
+        print('Reading .fdf images in .img direcory ...')
+        nv = niview(img=str(args.nifti))
+        nv.interactiveplot()
+
+    else:
+        print('Wrong input: not a .nii file')

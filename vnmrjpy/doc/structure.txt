@@ -1,0 +1,41 @@
+- Vnmrjpy project root dir (in virtualenv)
+	- vnmrjpy
+		{DIRS}
+		- config {config files: axes, data fromat etc}
+		- doc
+			- structure.txt
+			- conventions.txt
+		- recon
+			- __init__.py
+			- imake.py
+			- kmake.py 
+			- skipinttools.py {skipint handling class, etc}
+		- io
+			- __init__.py
+			- readprocpar.py
+			- readfid.py
+			- readfdf.py
+			- writenifti.py
+			- writefdf.py
+		- bin
+			- __init__.py
+			- fid2nii
+			- fid2fdf
+			- fdf2nii
+			- parfit {concept; general fitting cmd-line util}
+			- niview
+			- pget
+			- pyrecon
+			- gskipint
+		- aloha
+			- __init__.py
+			- hankelutils.py
+			- lmafit.py
+			- admm.py
+			- pyramidal.py
+		- fit {T1,T2,Dixon,etc}
+		{FILES}
+		- __init__.py
+		- setup.py
+		- README.md
+		- LICENCE
