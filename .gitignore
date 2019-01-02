@@ -1,5 +1,10 @@
 # ignore test data
-
-dataset/*
+dataset
+# ignore venv stuff
 lib/*
 bin/*
+pip-selfcheck*
+
+# test result niftis
+#
+test/results/*
