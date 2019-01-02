@@ -61,6 +61,13 @@ class ConfigParser():
                             val = float(val)
                         except:
                             pass
+                        if val in ['False','false','FALSE']:
+                            val = False
+                        elif val in ['True','true','TRUE']:
+                            val = True
+                        else:
+                            pass
+                                
                     conf_dict[key] = val
         return conf_dict
 

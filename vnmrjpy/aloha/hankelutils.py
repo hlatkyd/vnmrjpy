@@ -1,9 +1,7 @@
-#!/usr/local/bin/python3.6
-
 import numpy as np
-from numba import jit
 import matplotlib.pyplot as plt
 import copy
+import vnmrjpy as vj
 
 """
 Functions for handling Hankel matrices in various ALOHA implementations
@@ -23,7 +21,6 @@ def checkhankels(hankel_list):
 
     pass
 
-@jit
 def restore_center(slice3d, slice3d_orig):
     
     ind = slice3d_orig.shape[1]
@@ -34,7 +31,6 @@ def restore_center(slice3d, slice3d_orig):
 
     return slice3d
 
-@jit
 def finalize_pyramidal_stage(comp_stage3d, comp3d, slice3d, s, rp):
 
     m = slice3d.shape[1]  # phase dim
@@ -42,7 +38,6 @@ def finalize_pyramidal_stage(comp_stage3d, comp3d, slice3d, s, rp):
     comp3d[:,m//2-m//2**(s+1):m//2+m//2**(s+1),:] = comp_stage3d
     return comp3d
 
-@jit
 def kspace_pyramidal_init(slice3d, s):
     """
     Initialize stage s reduced kspace from previous stage
@@ -60,7 +55,6 @@ def kspace_pyramidal_init(slice3d, s):
 
     return kspace_init, center
 
-@jit
 def apply_pyramidal_weights_kxt(slice3d, weights_s, rp):
 
     weights_s = np.expand_dims(weights_s,axis=0)

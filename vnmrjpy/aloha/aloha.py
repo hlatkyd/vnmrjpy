@@ -4,26 +4,6 @@ import timeit
 import time
 import copy
 
-# TESTING PARAMETERS
-
-TESTDIR_ROOT = '/home/david/dev/vnmrjpy/dataset/cs/'
-#TESTDIR = TESTDIR_ROOT + 'ge3d_angio_HD_s_2018072604_HD_01.cs'
-#TESTDIR = TESTDIR_ROOT + 'gems_s_2018111301_axial_0_0_0_01.cs'
-TESTDIR = TESTDIR_ROOT+'mems_s_2018111301_axial_0_0_0_01.cs'
-PROCPAR = TESTDIR+'/procpar'
-# undersampling dimension
-CS_DIM = (1,4)  # phase and slice
-RO_DIM = 2
-STAGES = 3
-FILTER_SIZE = (7,5)
-
-SOLVER = 'ADMM'
-# different tolerance for the tages
-LMAFIT_TOL_LIST = [5e-2,5e-3,5e-4]
-"""
-NOTE: testing angio data: rcvrs, phase1, phase2, read
-NOTE gems data: 
-"""
 class Aloha():
     """Aloha framework for Compressed Sensing
 
@@ -122,29 +102,23 @@ class Aloha():
                                 self.kspace_cs.shape[1],\
                                 self.kspace_cs.shape[4])
 
-                x_len = kspace_cs.shape[self.rp['cs_dim'][0]]
-                t_len = kspace_cs.shape[self.rp['cs_dim'][1]]
+                x_len = self.kspace_cs.shape[self.rp['cs_dim'][0]]
+                t_len = self.kspace_cs.shape[self.rp['cs_dim'][1]]
                 #each element of weight list is an array of weights in stage s
                 weights_list = vj.aloha.make_pyramidal_weights_kxt(\
                                         x_len, t_len, self.rp)
                 factors = vj.aloha.make_hankel_decompose_factors(\
                                         slice3d_shape, self.rp)
             
-            #print('factors len : {}'.format(len(factors)))
-            #print('factors[0] shape : {}'.format(factors[0][0].shape))
            
             #------------------MAIN ITERATION----------------------------    
             for slc in range(self.kspace_cs.shape[3]):
 
                 for x in range(self.kspace_cs.shape[self.rp['cs_dim'][0]]):
-                    #TODO plotind is for testing only delete afterward
-                    if x == self.kspace_cs.shape[self.rp['cs_dim'][0]]//2-5:
-                        plotind = 1
-                    else: 
-                        plotind = 0
 
                     slice3d = self.kspace_cs[:,:,x,slc,:]
                     slice3d_orig = copy.deepcopy(slice3d)
+                    # main call for solvers
                     slice3d_completed = vj.aloha.pyramidal_solve_kt(slice3d,\
                                                         slice3d_orig,\
                                                         slice3d_shape,\
@@ -154,7 +128,8 @@ class Aloha():
                     kspace_completed[:,:,x,slc,:] = slice3d_completed
             
                     print('slice {}/{} line {}/{} done.'.format(\
-                                slc+1,kspace_cs.shape[3],x+1,kspace_cs.shape[2]))
+                                slc+1,self.kspace_cs.shape[3],\
+                                x+1,self.kspace_cs.shape[2]))
 
             return kspace_completed
 

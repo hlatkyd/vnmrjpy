@@ -32,7 +32,8 @@ class Admm():
         U = np.matrix(U)
         V = np.matrix(V)
         if rp['recontype'] in ['k-t','kx-ky','kx-ky_angio']:
-            self.hankel_mask = np.absolute(compose_hankel_2d(slice3d_cs_weighted,rp))
+            self.hankel_mask = np.absolute(vj.aloha.compose_hankel_2d(\
+                                            slice3d_cs_weighted,rp))
 
             self.decomp_factors = vj.aloha.make_hankel_decompose_factors(\
                                     slice3d_shape,rp)
@@ -51,7 +52,7 @@ class Admm():
         self.initpars = (U,V,slice3d_cs_weighted,slice3d_shape,stage,rp,\
                         mu,noiseless)
 
-    def solve(max_iter=100):
+    def solve(self):
         """The actual Admm iteration.
         
         Returns:
@@ -59,6 +60,7 @@ class Admm():
         """
         (U,V,slice3d_cs_weighted,slice3d_shape,s,rp,mu,noiseless) = self.initpars
 
+        max_iter = 100
         factors = self.decomp_factors
         hankel = np.matrix(U.dot(V.H))
 

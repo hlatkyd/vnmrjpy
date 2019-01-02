@@ -29,6 +29,8 @@ class SaveRecon():
     def save(self, outdir, savetype='full',filetype='nifti'):
         """Saves desired files to output dir
 
+        Creates directory, if not present
+
         Args:
             outdir -- path/to/saved/files
         Options:

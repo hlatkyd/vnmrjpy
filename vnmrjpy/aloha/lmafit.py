@@ -10,7 +10,7 @@ class Lmafit():
     ref.: paper
     """
     def __init__(self,init_data,\
-                known_data=None,\
+                known_data='NOT GIVEN',\
                 tol=None,\
                 k=None,\
                 rank_strategy=None,\
@@ -36,7 +36,7 @@ class Lmafit():
             rank_strategy = conf['lmafit_rank_strategy']
         if k == None:
             k = conf['lmafit_start_rank']
-        if known_data == None:
+        if (type(known_data) == str and known_data == 'NOT GIVEN'):
             if init_data[init_data == 0].size < init_data.size / 10:
                 raise(Exception('Known data not given'))
             known_data = copy.deepcopy(init_data)

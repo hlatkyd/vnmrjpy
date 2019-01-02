@@ -10,3 +10,4 @@ class Test_config(unittest.TestCase):
         self.assertEqual(type(tol),list)
         self.assertEqual(type(vj.config['module_dir']),str)
         self.assertEqual(vj.config['rcvr_dim'],0)
+        self.assertEqual(vj.config['vcboost'],bool)

@@ -2,21 +2,23 @@ import numpy as np
 import vnmrjpy as vj
 
 class ImageSpaceMaker():
-    """
-    Class to reconstruct MR images to real space from k-space.
+    """ Reconstruct MR images to real space from k-space.
+
     Generally this is done by fourier transform and corrections.
     Various compressed sensing approaches should be added here
-
     Hardcoded for each 'seqfil' sequence
     """
 
     def __init__(self, kspace, procpar):
-        """
-        kspace = np.ndarray([receivers, phase, read, slice, echo])
-        procpar = /procpar/file/path
-        For CS reconstruction:
-        skiptab = 'y' or 'n' procpar parameter
-        skipint = procpar parameter to show which k space lines are excluded
+        """Init params. In Aloha, standard FFT is used when k-space is ready
+
+        Args:
+            kspace = np.ndarray([receivers, phase, read, slice, echo])
+            procpar = /procpar/file/path
+
+            For CS reconstruction:
+            skiptab = 'y' or 'n' procpar parameter
+            skipint = procpar parameter to show which k space lines are excluded
         """
         self.kspace_data = kspace
         self.p = vj.io.ProcparReader(procpar).read()
