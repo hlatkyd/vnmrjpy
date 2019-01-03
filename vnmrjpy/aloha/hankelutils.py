@@ -31,7 +31,7 @@ def restore_center(slice3d, slice3d_orig):
 
     return slice3d
 
-def finalize_pyramidal_stage(comp_stage3d, comp3d, slice3d, s, rp):
+def finalize_pyramidal_stage_kt(comp_stage3d, comp3d, slice3d, s, rp):
 
     m = slice3d.shape[1]  # phase dim
     # replace kspace elements with the completed ones from the stage
@@ -55,6 +55,15 @@ def kspace_pyramidal_init(slice3d, s):
 
     return kspace_init, center
 
+def apply_pyramidal_weights_kxky(slice3d, weights_s, rp):
+
+    weights_s = np.expand_dims(weights_s,axis=0)
+    weights_s = np.expand_dims(weights_s,axis=-1)
+    weights_s = np.repeat(weights_s,slice3d.shape[0],axis=0)
+    weights_s = np.repeat(weights_s,slice3d.shape[2],axis=-1)
+
+    return np.multiply(slice3d, weights_s,dtype=DTYPE)
+
 def apply_pyramidal_weights_kxt(slice3d, weights_s, rp):
 
     weights_s = np.expand_dims(weights_s,axis=0)
@@ -75,10 +84,39 @@ def remove_pyramidal_weights_kxt(slice3d, center, weights_s):
     #slice3d_unweighted[:,slice3d.shape[1]//2-1,:] = center
     return slice3d_unweighted
 
-def make_pyramidal_weights_kxt(kx_len, t_len ,rp):
+def make_pyramidal_weights_kxkyangio(kx_len, ky_len ,rp):
+    """Makes weights for total variation sparse image (angiography). 
+
+    The weights are from the Fourier transform of Haar wavelets
+    INPUT: kx_len : cs array initial length (kspace shape along phase
+            encode direction)
+            ky_len : kspace shape along pe2 direction
+            rp :  reconparameters dictionary
+    OUTPUT : weights_list: list of weight arrays at various pyramidal
+                            decomp stages (s)
     """
-    Makes weights for wavelet sparse image. The weights are from the 
-    Fourier transform of Haar wavelets
+        
+    def haar_weights(s,w):
+        if w!=0:
+            we = 1/np.sqrt(2**s)*(-1j*2**s*w)/2*\
+                (np.sin(2**s*w/4)/(2**s*w/4))**2*np.exp(-1j*2**s*w/2)
+        else:
+            we = 0.001  # just something small not to divide by 0 accidently
+        return we
+    weights_list = [] 
+
+    for s in range(rp['stages']):
+        # only one stage ...
+        w_samples = [2*np.pi/kx_len*k for k in\
+                     range(-int(kx_len/2**(s+1)),int(kx_len/2**(s+1)))]
+        w_arr = np.array([haar_weights(s,i) for i in w_samples],dtype=DTYPE)
+        weights_list.append(w_arr)
+
+    return weights_list
+def make_pyramidal_weights_kxt(kx_len, t_len ,rp):
+    """ Makes weights for wavelet sparse image. 
+
+    The weights are from the Fourier transform of Haar wavelets
     INPUT: kx_len : cs array initial length (kspace shape along phase
             encode direction)
             t_len : kspace shape along time direction
@@ -182,18 +220,20 @@ def decompose_hankel_2d(hankel,slice3d_shape,s, factors, rp):
     (factor_inner, factor_outer) = factors
     # ------------decomposing outer hankel---------------------
     if rp['virtualcoilboost'] == False:
-        receiverdim = int(rp['rcvrs'])
+        receivernum = int(rp['rcvrs'])
     elif rp['virtualcoilboost'] == True:
-        receiverdim = int(rp['rcvrs']*2)
+        receivernum = int(rp['rcvrs']*2)
 
-    for i in range(receiverdim):
-        hankel_1rcvr = hankel[:,hankel.shape[1]//rp['rcvrs']*i:\
-                            hankel.shape[1]//rp['rcvrs']*(1+i)]
-        inner_hankel_arr = np.zeros((n,ih_col,ih_row),dtype=DTYPE)
+    chnum = slice3d_shape[0]
+
+    for i in range(chnum):
+        hankel_1rcvr = hankel[:,hankel.shape[1]//chnum*i:\
+                            hankel.shape[1]//chnum*(1+i)]
+        inner_hankel_arr = np.zeros((n,ih_col,ih_row),dtype='complex64')
         # how many occurrences of H_inner[j] are in outer hankel
         for j in range(0,q):
             # for each slab in outer hankel
-            fill_arr = np.zeros((n,ih_col,ih_row),dtype=DTYPE) 
+            fill_arr = np.zeros((n,ih_col,ih_row),dtype='complex64') 
             cols = [hankel_1rcvr[(m-p+1)*k:(m-p+1)*(k+1),p*j:p*(j+1)] \
                     for k in range(0,n-q+1)]
             cols = np.array(cols)
@@ -205,7 +245,7 @@ def decompose_hankel_2d(hankel,slice3d_shape,s, factors, rp):
         # ----------------decomposing inner hankels------------
         for j in range(0,n):
             inner_hank_j = inner_hankel_avg_arr[j,:,:]
-            hankel_j_arr = np.zeros(m,dtype=DTYPE)
+            hankel_j_arr = np.zeros(m,dtype='complex64')
             cols = [inner_hank_j[:,k] for k in range(inner_hank_j.shape[1])]
             cols = np.array(cols, dtype=DTYPE)
             for k in range(0,len(cols)):

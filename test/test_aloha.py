@@ -35,14 +35,15 @@ class Test_Aloha(unittest.TestCase):
             seqdir = '/mems_s_2018111301_axial_0_0_0_01.cs'
             testdir = vj.cs+seqdir
             procpar = testdir + '/procpar'
-            resultdir = vj.config['testresults_dir']+'/aloha/'+seqdir[:-3]+'.nifti'
+            resultdir = vj.config['testresults_dir']+'/aloha'+seqdir[:-3]+'.nifti'
             savedir = resultdir
         elif data == 'angio':
-            seqdir = '/mems_s_2018111301_axial_0_0_0_01.cs'
+            seqdir = '/ge3d_angio_HD_s_2018072604_HD_01.cs'
             testdir = vj.cs+seqdir
             procpar = testdir + '/procpar'
-            resultdir = vj.config['testresults_dir']+'/aloha/'+seqdir[:-3]+'.nifti'
+            resultdir = vj.config['testresults_dir']+'/aloha'+seqdir[:-3]+'.nifti'
             savedir = resultdir
+
         elif data == None:
             raise(Exception('Testdata not specified'))
 
@@ -77,16 +78,24 @@ class Test_Aloha(unittest.TestCase):
                 affine,\
                 procpar,\
                 savedir)
+    """
+    def test_angio(self):
+    
+        kspace_orig, kspace_cs, affine, procpar, savedir = \
+                                        self._load_data(data='angio')
 
+        aloha = vj.aloha.Aloha(kspace_cs,procpar)
+        kspace_filled = aloha.recon() 
+        self._save_test_results(procpar,affine,savedir,\
+                                kspace_orig,kspace_cs,kspace_filled)
+    """
     def test_mems(self):
     
         kspace_orig, kspace_cs, affine, procpar, savedir = \
                                         self._load_data(data='mems')
 
         aloha = vj.aloha.Aloha(kspace_cs,procpar)
-        print(aloha.rp)
         kspace_filled = aloha.recon() 
         self._save_test_results(procpar,affine,savedir,\
                                 kspace_orig,kspace_cs,kspace_filled)
 
-        

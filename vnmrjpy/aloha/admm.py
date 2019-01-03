@@ -17,7 +17,8 @@ class Admm():
                 mu=1000,\
                 realtimeplot=True,\
                 noiseless=True,\
-                device='CPU'):
+                device='CPU',\
+                max_iter=100):
         """Initialize solver
         
         Args:
@@ -50,7 +51,7 @@ class Admm():
 
         # putting initpars into tuple
         self.initpars = (U,V,slice3d_cs_weighted,slice3d_shape,stage,rp,\
-                        mu,noiseless)
+                        mu,noiseless,max_iter)
 
     def solve(self):
         """The actual Admm iteration.
@@ -58,9 +59,9 @@ class Admm():
         Returns:
             hankel = U.dot(V.H) (np.matrix)
         """
-        (U,V,slice3d_cs_weighted,slice3d_shape,s,rp,mu,noiseless) = self.initpars
+        (U,V,slice3d_cs_weighted,slice3d_shape,s,rp,mu,noiseless,\
+                                                    max_iter) = self.initpars
 
-        max_iter = 100
         factors = self.decomp_factors
         hankel = np.matrix(U.dot(V.H))
 

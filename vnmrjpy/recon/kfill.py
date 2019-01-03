@@ -20,6 +20,7 @@ class KspaceCompleter():
 
         self.kspace = kspace
         self.ppdict = ppdict
+        self.procpar = procpar
 
     def make(self):
         """Run ALOHA or pass if already complete"""
@@ -27,4 +28,12 @@ class KspaceCompleter():
         if self.is_complete:
             return self.kspace
         else:
-            pass
+            # TODO
+            raise(Exception('Not implemented yet'))
+            # TODO if reconpar is in procpar
+            #rp = self.ppdict['reconpar']
+            rp = None
+
+            aloha = vj.aloha.Aloha(self.kspace,self.procpar,reconpar=rp)
+            return aloha.recon()
+            

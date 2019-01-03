@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import nibabel as nib
 import vnmrjpy as vj
 
@@ -47,6 +48,12 @@ class SaveRecon():
                 'nifti'
                 'fdf'
         """
+        if not os.path.exists(outdir):
+            try:
+                os.makedirs(outdir)
+            except:
+                raise
+
         if savetype in ['magn','fullimag','full']:
             #saving sum of squares magnitude
             img = np.sum(np.absolute(self.imagespace),axis=0)
