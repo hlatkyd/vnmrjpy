@@ -23,3 +23,4 @@ pics = dataset+'/testpics'
 
 # Read config file
 config = util.ConfigParser().parse()
+

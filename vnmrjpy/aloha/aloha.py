@@ -70,6 +70,7 @@ class Aloha():
         self.p = vj.io.ProcparReader(procpar).read() 
         self.recontype = _get_recontype(reconpar)
         self.rp = _get_reconpar(self.recontype)
+        self.conf = vj.config
         self.kspace_cs = np.array(kspace_cs, dtype='complex64')
 
     def recon(self):
@@ -96,11 +97,12 @@ class Aloha():
         if self.rp['recontype'] in ['k-t','kx-ky','kx-ky_angio']:
 
 
-            if self.rp['recontype'] == 'k-t':
             #----------------------MAIN INIT----------------------------    
-                slice3d_shape = (self.kspace_cs.shape[0],\
-                                self.kspace_cs.shape[1],\
-                                self.kspace_cs.shape[4])
+            if self.rp['recontype'] == 'k-t':
+
+                slice3d_shape = (self.kspace_cs.shape[self.conf['rcvr_dim']],\
+                                self.kspace_cs.shape[self.conf['pe_dim']],\
+                                self.kspace_cs.shape[self.conf['et_dim']])
 
                 x_len = self.kspace_cs.shape[self.rp['cs_dim'][0]]
                 t_len = self.kspace_cs.shape[self.rp['cs_dim'][1]]
@@ -110,7 +112,21 @@ class Aloha():
                 factors = vj.aloha.make_hankel_decompose_factors(\
                                         slice3d_shape, self.rp)
             
-           
+            if self.rp['recontype'] == 'kx-ky_angio':           
+
+                slice3d_shape = (self.kspace_cs.shape[self.conf['rcvr_dim']],\
+                                self.kspace_cs.shape[self.conf['pe_dim']],\
+                                self.kspace_cs.shape[self.conf['pe2_dim']])
+
+                x_len = self.kspace_cs.shape[self.rp['cs_dim'][0]]
+                t_len = self.kspace_cs.shape[self.rp['cs_dim'][1]]
+                #each element of weight list is an array of weights in stage s
+                weights_list = vj.aloha.make_pyramidal_weights_kxkyangio(\
+                                        x_len, t_len, self.rp)
+                factors = vj.aloha.make_hankel_decompose_factors(\
+                                        slice3d_shape, self.rp)
+            
+            if self.rp['recontype'] == 'kx-ky_angio':           
             #------------------MAIN ITERATION----------------------------    
             for slc in range(self.kspace_cs.shape[3]):
 
@@ -133,73 +149,3 @@ class Aloha():
 
             return kspace_completed
 
-#----------------------------------FOR TESTING---------------------------------
-
-def save_test_data(kspace_orig, kspace_cs, kspace_filled, affine):
-
-    def makeimg(kspace):
-
-        img_space = np.fft.ifft2(kspace, axes=(1,2), norm='ortho')
-        img_space = np.fft.fftshift(img_space, axes=(1,2))
-        return img_space
-
-    SAVEDIR = '/home/david/dev/vnmrjpy/aloha/result_aloha/'
-
-    # saving kspace
-    kspace_orig_ch1 = nib.Nifti1Image(np.absolute(kspace_orig[0,...]), affine) 
-    nib.save(kspace_orig_ch1, SAVEDIR+'kspace_orig')
-    kspace_cs_ch1 = nib.Nifti1Image(np.absolute(kspace_cs[0,...]), affine) 
-    nib.save(kspace_cs_ch1, SAVEDIR+'kspace_cs')
-    kspace_filled_ch1 = nib.Nifti1Image(np.absolute(kspace_filled[0,...]),\
-                                         affine) 
-    nib.save(kspace_filled_ch1, SAVEDIR+'kspace_filled')
-    # saving 6D raw kspace - 5D standard, 6th real/imag
-    kspace_filled_6d_data = np.stack((np.real(kspace_filled), \
-                            np.imag(kspace_filled)), \
-                            axis=len(kspace_filled.shape))
-    kspace_filled_6d = nib.Nifti1Image(kspace_filled_6d_data,affine)
-    nib.save(kspace_filled_6d, SAVEDIR+'kspace_filled_6d')
-    
-    
-
-
-    imgspace_orig = makeimg(kspace_orig) 
-    imgspace_cs = makeimg(kspace_cs) 
-    imgspace_filled = makeimg(kspace_filled) 
-    # saving combined magnitude
-    name_list = ['img_orig_full','img_cs_full','img_filled_full']
-    for num,item in enumerate([imgspace_orig,imgspace_cs,imgspace_filled]):
-        img_comb = np.mean(np.absolute(item),axis=0)
-        img_comb = nib.Nifti1Image(img_comb,affine)
-        nib.save(img_comb,SAVEDIR+name_list[num])
-    # saving for fslview
-    imgspace_orig_ch1 = nib.Nifti1Image(np.absolute(imgspace_orig[0,...]),\
-                                        affine) 
-    nib.save(imgspace_orig_ch1, SAVEDIR+'imgspace_orig')
-    imgspace_cs_ch1 = nib.Nifti1Image(np.absolute(imgspace_cs[0,...]),\
-                                        affine) 
-    nib.save(imgspace_cs_ch1, SAVEDIR+'imgspace_cs')
-    imgspace_filled_ch1 = nib.Nifti1Image(np.absolute(imgspace_filled[0,...]),\
-                                        affine) 
-    nib.save(imgspace_filled_ch1, SAVEDIR+'imgspace_filled')
-
-    #saving 5d magnitude and phase
-    imgspace_filled_5d_magn = np.absolute(imgspace_filled)
-    imgspace_filled_5d_phase = np.arctan2(np.imag(imgspace_filled),\
-                                        np.real(imgspace_filled))
-    magn5d = nib.Nifti1Image(imgspace_filled_5d_magn,affine)
-    phase5d = nib.Nifti1Image(imgspace_filled_5d_phase,affine)
-    nib.save(magn5d,SAVEDIR+'img_filled_5d_magn')
-    nib.save(phase5d,SAVEDIR+'img_filled_5d_phase')
-
-
-if __name__ == '__main__':
-
-    kspace_orig, kspace_cs, affine = load_test_data()
-
-    aloha = ALOHA(PROCPAR, kspace_cs, kspace_orig)
-    start_time = time.time()
-    kspace_filled = aloha.recon()
-    print('elapsed time {}'.format(time.time()-start_time))
-
-    save_test_data(kspace_orig, kspace_cs, kspace_filled, affine)
