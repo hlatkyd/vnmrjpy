@@ -37,11 +37,24 @@ class Aloha():
         TODO : kspace_orig is for test purposes only
         """
         def _get_recontype(reconpar):
+            """get 'recontype', which defines Hankel matrix construction
 
+            Return:
+                recontype (str)
+            """
+            if 'cs' in self.p['apptype']:
+                raise(Exception('Cs apptypes not ready yet!'))
+            else:
+                pass
+            # these are for testing. real reconpar will come from apptype
+            # TODO
+            # or procpar
             if 'angio' in self.p['pslabel']:
                 recontype = 'kx-ky_angio'
             elif 'mems' in self.p['pslabel']:
                 recontype = 'k-t'
+            elif 'ge3d' in self.p['pslabel']:
+                recontype = 'kx-ky'
             else:
                 raise(Exception('Recon type not implemented yet!'))
             return recontype

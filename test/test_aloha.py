@@ -31,11 +31,21 @@ class Test_Aloha(unittest.TestCase):
         kspace_filled = aloha.recon() 
         self._save_test_results(procpar,affine,savedir,\
                                 kspace_orig,kspace_cs,kspace_filled)
-    """
     def test_gems(self):
     
         kspace_orig, kspace_cs, affine, procpar, savedir = \
                                         self._load_data(data='gems')
+
+        nib.viewers.OrthoSlicer3D(np.absolute(kspace_cs)[0,...]).show()
+        aloha = vj.aloha.Aloha(kspace_cs,procpar)
+        kspace_filled = aloha.recon() 
+        self._save_test_results(procpar,affine,savedir,\
+                                kspace_orig,kspace_cs,kspace_filled)
+    """
+    def test_gems(self):
+    
+        kspace_orig, kspace_cs, affine, procpar, savedir = \
+                                        self._load_data(data='ge3d')
 
         nib.viewers.OrthoSlicer3D(np.absolute(kspace_cs)[0,...]).show()
         aloha = vj.aloha.Aloha(kspace_cs,procpar)
@@ -66,25 +76,19 @@ class Test_Aloha(unittest.TestCase):
 
         if data == 'mems':
             seqdir = '/mems_s_2018111301_axial_0_0_0_01.cs'
-            testdir = vj.cs+seqdir
-            procpar = testdir + '/procpar'
-            resultdir = vj.config['testresults_dir']+'/aloha'+seqdir[:-3]+'.nifti'
-            savedir = resultdir
         elif data == 'angio':
             seqdir = '/ge3d_angio_HD_s_2018072604_HD_01.cs'
-            testdir = vj.cs+seqdir
-            procpar = testdir + '/procpar'
-            resultdir = vj.config['testresults_dir']+'/aloha'+seqdir[:-3]+'.nifti'
-            savedir = resultdir
         elif data == 'gems':
             seqdir = '/gems_s_2018111301_axial90_0_90_0_01.cs'
-            testdir = vj.cs+seqdir
-            procpar = testdir + '/procpar'
-            resultdir = vj.config['testresults_dir']+'/aloha'+seqdir[:-3]+'.nifti'
-            savedir = resultdir
-
+        elif data == 'ge3d':
+            seqdir = '/ge3d_s_2018111301_axial_0_0_0_01.cs'
         elif data == None:
             raise(Exception('Testdata not specified'))
+
+        testdir = vj.cs+seqdir
+        procpar = testdir + '/procpar'
+        resultdir = vj.config['testresults_dir']+'/aloha'+seqdir[:-3]+'.nifti'
+        savedir = resultdir
 
         imag = []
         real = []
