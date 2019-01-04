@@ -21,8 +21,10 @@ class FdfReader():
         self.conf = vj.config
     
     def read(self):
-        """Read file"""
+        """Read file
 
+        Returns: (header, data)
+        """        
         #---------------- auxiliary functions for read method -----------------
 
         def preproc_fdf(fdf):

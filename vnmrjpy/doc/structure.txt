@@ -1,15 +1,21 @@
-- Vnmrjpy project root dir (in virtualenv)
+﻿- Vnmrjpy project root dir (in virtualenv)
 	- vnmrjpy
 		{DIRS}
 		- config {config files: axes, data fromat etc}
 		- doc
 			- structure.txt
 			- conventions.txt
+		- util
+			- __init__.py	
+			- configparser.py
+			- plotutils.py
+			- csdatagen.py
+			- skipinttools.py {skipint handling class, etc}
 		- recon
 			- __init__.py
 			- imake.py
-			- kmake.py 
-			- skipinttools.py {skipint handling class, etc}
+			- kmake.py
+			- kfill.py			
 		- io
 			- __init__.py
 			- readprocpar.py
@@ -17,6 +23,7 @@
 			- readfdf.py
 			- writenifti.py
 			- writefdf.py
+			- saverecon.py
 		- bin
 			- __init__.py
 			- fid2nii
@@ -33,6 +40,7 @@
 			- lmafit.py
 			- admm.py
 			- pyramidal.py
+			- lowranksolvers.py
 		- fit {T1,T2,Dixon,etc}
 		{FILES}
 		- __init__.py

@@ -2,6 +2,7 @@ import numpy as np
 import os
 import nibabel as nib
 import vnmrjpy as vj
+from shutil import copyfile
 
 class SaveRecon():
     """Save reconstruction results to nifti or fdf files in orderly manner
@@ -42,6 +43,7 @@ class SaveRecon():
                 'magn' -- only combined magnitude
                 'fullimag'  -- combined magnitude, per channel magnitude,phase
                 'fullkspace' -- per channel imag, real kspace
+                'mask' -- only save kspace mask
 
             filetype -- output file type
 
@@ -53,6 +55,8 @@ class SaveRecon():
                 os.makedirs(outdir)
             except:
                 raise
+
+        copyfile(self.procpar,outdir+'/procpar')
 
         if savetype in ['magn','fullimag','full']:
             #saving sum of squares magnitude
@@ -84,6 +88,12 @@ class SaveRecon():
                 vj.io.NiftiWriter(img,self.procpar).write(out)
         if savetype == 'full':
             pass
+        if savetype == 'mask':
+            # saving only mask
+            img = self.imagespace
+            out = outdir+'/'+self.basename+'_mask'
+            vj.io.NiftiWriter(img,self.procpar).write(out)
 
 
-        
+
+
