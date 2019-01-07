@@ -1,0 +1,2 @@
+1. CHECK : Mask generation; wrong oputput axes maybe
+2. DO: kx ky wavelet in aloha
