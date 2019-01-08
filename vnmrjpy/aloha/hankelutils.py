@@ -26,31 +26,36 @@ def construct_hankel(nd_data, rp, level=None,order=None):
         """Create hanekl from a vector of matrices
 
         Args:
-            block_vector
-            filt
+            block_vector (np.ndarray) --  vector of matrices
+            filt (int)  -- filter size on dimension according to Hankel level
         Return:
             hankel
         """
         if len(block_vector.shape) == 1:
+            lvl=1
             block_vector = np.expand_dims(block_vector,axis=-1) 
             block_vector = np.expand_dims(block_vector,axis=-1) 
-        if len(block_vector.shape) == 2:
-            block_vector = np.expand_dims(block_vector,axis=-1) 
-
+        if len(block_vector.shape) == 3:
+            lvl=2
+        else:
+            raise(Exception('weird shape'))
         shape_x = (block_vector.shape[0]-filt+1)*block_vector.shape[1]
         shape_y = block_vector.shape[2]*filt
         hankel = np.zeros((shape_x,shape_y),dtype='complex64')
 
-        # columns as rows if a matrix is considered an element
-        col_num = filt
         row_num = block_vector.shape[0]-filt+1
-        col_size = block_vector.shape[1]
-        row_size = block_vector.shape[2]
+        col_num = filt
+        row_size = block_vector.shape[1]
+        col_size = block_vector.shape[2]
         for col in range(col_num):
-            for row in range(row_num):
-                hankel[col_num*col_size:(col_num+1)*col_size,\
-                    row_num*row_size:(row_num+1)*row_size] = block_vector[5,:,:]
 
+            for row in range(row_num):
+
+                hankel[row*row_size : (row+1)*row_size,\
+                        col*col_size : (col+1)*col_size] = \
+                                            block_vector[col+row,:,:]
+
+        #print('OK, level {}'.format(lvl))
         return hankel
 
     nd_data = np.array(nd_data, dtype='complex64')
@@ -61,7 +66,7 @@ def construct_hankel(nd_data, rp, level=None,order=None):
 
     if level == 1:
 
-        pass
+        raise(Exception('not implemented'))
 
     if level == 2:    
         # annihilating filter size
@@ -69,12 +74,18 @@ def construct_hankel(nd_data, rp, level=None,order=None):
         # hankel m n
         m, n = nd_data.shape[1:]
         #init final shape
-        shape_x = (nd_data.shape[1]-p+1)*(nd_data.shape[2]-q+1)
+        shape_x = (m-p+1)*(n-q+1)
         shape_y = p*q*nd_data.shape[0]  # concatenate along receiver dimension
-        hankel = np.zeros((shape_x,shape_y),dtype='complex64')
+        shape_x_lvl1 = m-p+1
+        shape_y_lvl1 = p
+        shape_x_rcvr = shape_x
+        shape_y_rcvr = shape_y//nd_data.shape[0]
         
-        hankel_lvl1_vec = np.zeros()
-        print(hankel.shape)
+        hankel_rcvr = np.zeros((shape_x_rcvr,shape_y_rcvr),dtype='complex64')
+        hankel_lvl1_vec = np.zeros((n,shape_x_lvl1,shape_y_lvl1),dtype='complex64')
+        hankel = np.zeros((shape_x,shape_y),dtype='complex64')
+        print('hankel dest shape : {}'.format(hankel.shape))
+
         for rcvr in range(nd_data.shape[0]):
 
             for j in range(nd_data.shape[2]):
@@ -82,52 +93,75 @@ def construct_hankel(nd_data, rp, level=None,order=None):
                 vec = [nd_data[rcvr,i,j] for i in range(nd_data.shape[1])]
                 vec = np.array(vec)
                 hankel_lvl1 = _construct_hankel_level(vec,p)
-                hankel_rcvr[j,:,:] = hankel_lvl1
-            hankel_rcvr = _contruct_hankel_level(hankel_lvl1,q)
-    """
-        if rp['virtualcoilboost'] == False:
-            receiverdim = int(rp['rcvrs'])
-        elif rp['virtualcoilboost'] == True:
-            receiverdim = int(rp['rcvrs']*2)
-     
-        for rcvr in range(receiverdim):
+                hankel_lvl1_vec[j,:,:] = hankel_lvl1
+            hankel_rcvr = _construct_hankel_level(hankel_lvl1_vec,q)
+            hankel[:,rcvr*shape_y_rcvr:(rcvr+1)*shape_y_rcvr] = hankel_rcvr
 
-            slice2d = nd_data[rcvr,...]
+        return hankel
 
-            #make inner hankel list
-            for j in range(0,n):
-                # iterate in outer hankel elements
-                for k in range(0,p):
-                    # iterate inner hankel columns
-                    col = np.expand_dims(slice2d[k:m-p+k+1,j],axis=1)
-                    if k == 0:
-                        cols = col
-                    else:
-                        cols = np.concatenate([cols,col],axis=1)
-                if j == 0:
-                    hankel = np.expand_dims(cols,axis=0)
-                else:
-                    hankel = np.concatenate(\
-                        [hankel, np.expand_dims(cols,axis=0)], axis=0)
-
-            # make outer hankel
-            for i in range(q):
-                #col = cp.hstack([hankel[i:n-q+i,:,:]])
-                col = np.vstack([hankel[k,:,:] for k in range(i,n-q+i+1)])
-                if i == 0:
-                    cols = col
-                else:
-                    cols = np.concatenate([cols,col], axis=1)
-            # concatenating along the receivers
-            if rcvr == 0:
-                hankel_full = cols
-            else:
-                hankel_full = np.concatenate([hankel_full, cols], axis=1)
-
-        return hankel_full
-    """
     if level == 3:
-        pass
+        raise(Exception('not implemented'))
+
+def deconstruct_hankel(hankel,rp):
+    """Make the original ndarray from the multilevel Hankel matrix.
+
+    Used upon completion, and also in an ADMM averaging step
+    
+    Args:
+        hankel (np.ndarray) -- input hankel matrix
+        rp (dictionary) -- recon parameters
+        
+    Return:
+        nd_data (np.ndarray)
+
+    """
+    # init
+    if rp['recontype'] in ['kx-ky','k-t','kx-ky_angio']:
+        level = 2
+    # work work 
+    if level == 1:
+        raise(Exception('not implemented') )
+    elif level == 2:
+        
+        # subinit level
+        kshape = rp['orig_shape']
+        (rcvrs,m,n) = kshape
+        (p,q) = rp['filter_size']
+        cols_rcvr_lvl2 = hankel.shape[1]//kshape[0]
+        nd_data = np.zeros((rcvrs,m,n),dtype='complex64')        
+        block_vector_lvl2 = np.zeros((n,m-p+1,p),dtype='complex64')
+        block_vector_lvl1 = np.zeros((m,1,1),dtype='complex64')
+        #bshape_x = m-p+1
+        #bshape_y = p
+        factors_lvl2 = np.zeros(n,dtype='int') # multiplicity of 1 block
+        ramp = [i for i in range(1,q)]
+        factors_lvl2[0:len(ramp)] = ramp
+        factors_lvl2[n-len(ramp):] = ramp[::-1]
+        factors_lvl2[factors_lvl2 == 0] = q
+
+        factors_lvl1 = np.zeros(m,dtype='int') # multiplicity of 1 block
+        ramp = [i for i in range(1,p)]
+        factors_lvl1[0:len(ramp)] = ramp
+        factors_lvl1[m-len(ramp):] = ramp[::-1]
+        factors_lvl1[factors_lvl1 == 0] = p
+        
+        # decompose level2
+        for rcvr in range(rcvrs):
+
+            for col in range(cols_rcvr_lvl2):
+                to_add = np.zeros(block_vector_lvl2.shape,dtype='complex64')
+                to_add[ind] = hankel[otherind]
+                block_vector_lvl2 = block_vector_lvl2 + to_add
+                pass
+
+
+        return nd_data
+
+    elif level == 3:
+        raise(Exception('not implemented'))
+    else:
+        raise(Exception('not implemented'))
+
 # DEPRECATED------------------------------------------------------------------
 def checkutils(weights_list,factors):
 

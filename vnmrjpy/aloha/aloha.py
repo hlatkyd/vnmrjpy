@@ -36,7 +36,7 @@ class Aloha():
 
         TODO : kspace_orig is for test purposes only
         """
-        def _get_recontype(reconpar):
+        def _get_recontype():
             """get 'recontype', which defines Hankel matrix construction
 
             Return:
@@ -59,8 +59,13 @@ class Aloha():
                 raise(Exception('Recon type not implemented yet!'))
             return recontype
 
-        def _get_reconpar(recontype,reconpar):
-            """Make 'rp' recon parameters dictionary"""
+        def _get_reconpar(recontype,reconpar,kspace_shape):
+            """Make 'rp' recon parameters dictionary
+
+            Reconpar is the main parameter repository of the whole Aloha
+            framework. It goes into almost all utility functions during
+            recon.
+            """
 
             #TODO maybe make a procpar parameter of this?
             if reconpar == None:
@@ -70,16 +75,25 @@ class Aloha():
                     cs_dim = (vj.config['pe_dim'],vj.config['slc_dim'])
                     ro_dim = vj.config['ro_dim']
                     stages = 3
+                    orig_shape = (kspace_shape[vj.config['rcvr_dim']],\
+                                    kspace_shape[vj.config['pe_dim']],\
+                                    kspace_shape[vj.config['et_dim']])
                 elif recontype in ['kx-ky']:
                     filter_size = (11,11)
                     cs_dim = (vj.config['pe_dim'],vj.config['pe2_dim'])
                     ro_dim = vj.config['ro_dim']
                     stages = 3
+                    orig_shape = (kspace_shape[vj.config['rcvr_dim']],\
+                                    kspace_shape[vj.config['pe_dim']],\
+                                    kspace_shape[vj.config['pe2_dim']])
                 elif recontype in ['kx-ky_angio']:
                     filter_size = (11,11)
                     cs_dim = (vj.config['pe_dim'],vj.config['pe2_dim'])
                     ro_dim = vj.config['ro_dim']
                     stages = 1
+                    orig_shape = (kspace_shape[vj.config['rcvr_dim']],\
+                                    kspace_shape[vj.config['pe_dim']],\
+                                    kspace_shape[vj.config['pe2_dim']])
                 else:
                     raise(Exception('Not implemented'))
 
@@ -90,6 +104,7 @@ class Aloha():
                             'recontype' : recontype,\
                             'timedim' : vj.config['et_dim'],\
                             'stages' : stages,\
+                            'orig_shape':orig_shape,\
                             'virtualcoilboost' : vj.config['vcboost'],\
                             'solver' : 'lmafit'}
                 return rp
@@ -107,8 +122,8 @@ class Aloha():
                 return reconpar
 
         self.p = vj.io.ProcparReader(procpar).read() 
-        self.recontype = _get_recontype(reconpar)
-        self.rp = _get_reconpar(self.recontype,reconpar)
+        self.recontype = _get_recontype()
+        self.rp = _get_reconpar(self.recontype,reconpar, kspace_cs.shape)
         self.conf = vj.config
         self.kspace_cs = np.array(kspace_cs, dtype='complex64')
 
