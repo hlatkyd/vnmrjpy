@@ -75,7 +75,7 @@ class Aloha():
                     cs_dim = (vj.config['pe_dim'],vj.config['slc_dim'])
                     ro_dim = vj.config['ro_dim']
                     stages = 3
-                    orig_shape = (kspace_shape[vj.config['rcvr_dim']],\
+                    fiber_shape = (kspace_shape[vj.config['rcvr_dim']],\
                                     kspace_shape[vj.config['pe_dim']],\
                                     kspace_shape[vj.config['et_dim']])
                 elif recontype in ['kx-ky']:
@@ -83,7 +83,7 @@ class Aloha():
                     cs_dim = (vj.config['pe_dim'],vj.config['pe2_dim'])
                     ro_dim = vj.config['ro_dim']
                     stages = 3
-                    orig_shape = (kspace_shape[vj.config['rcvr_dim']],\
+                    fiber_shape = (kspace_shape[vj.config['rcvr_dim']],\
                                     kspace_shape[vj.config['pe_dim']],\
                                     kspace_shape[vj.config['pe2_dim']])
                 elif recontype in ['kx-ky_angio']:
@@ -91,12 +91,13 @@ class Aloha():
                     cs_dim = (vj.config['pe_dim'],vj.config['pe2_dim'])
                     ro_dim = vj.config['ro_dim']
                     stages = 1
-                    orig_shape = (kspace_shape[vj.config['rcvr_dim']],\
+                    fiber_shape = (kspace_shape[vj.config['rcvr_dim']],\
                                     kspace_shape[vj.config['pe_dim']],\
                                     kspace_shape[vj.config['pe2_dim']])
                 else:
                     raise(Exception('Not implemented'))
 
+                # initialize reconstruction parameters for the whole Aloha
                 rp = {'filter_size' : filter_size ,\
                             'cs_dim' : cs_dim ,\
                             'ro_dim' : ro_dim, \
@@ -104,7 +105,7 @@ class Aloha():
                             'recontype' : recontype,\
                             'timedim' : vj.config['et_dim'],\
                             'stages' : stages,\
-                            'orig_shape':orig_shape,\
+                            'fiber_shape':fiber_shape,\
                             'virtualcoilboost' : vj.config['vcboost'],\
                             'solver' : 'lmafit'}
                 return rp

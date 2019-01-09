@@ -9,6 +9,150 @@ Functions for handling Hankel matrices in various ALOHA implementations
 """
 
 DTYPE = 'complex64'
+
+def init_kspace_stage(kspace_prev_stage,stage,rp):
+    """Setup kspace for current pyramidal stage
+
+    At each stage except 0, kspace data is taken from previos completed stage
+    
+
+    """
+    if stage == 0:
+        return kspace_prev_stage
+         
+    if rp['recontype'] in ['kx-ky','kx-ky_angio']: 
+
+        kx_ind = kspace_prev_stage.shape[1]
+        ky_ind = kspace_prev_stage.shape[2]
+        kspace_init = kspace_prev_stage[:,kx_ind//2-kx_ind//2**(stage+1): \
+                                          kx_ind//2+kx_ind//2**(stage+1),\
+                                        ky_ind//2-ky_ind//2**(stage+1):\
+                                        ky_ind//2+ky_ind//2**(stage+1)] 
+    elif rp['recontype'] == 'k-t':
+        kx_ind = kspace_prev_stage.shape[1]
+        kspace_init = kspace_prev_stage[:,kx_ind//2-kx_ind//2**(stage+1): \
+                                          kx_ind//2+kx_ind//2**(stage+1),:] 
+        
+    else:
+        raise(Exception('not implemented'))
+
+
+    return kspace_init
+
+def finalize_kspace_stage():
+    """Complete pyramidal stage, put inferred data back into original position
+
+
+    """
+    pass
+
+def make_kspace_weights(rp):
+    """Create weight data for kspace weighting
+
+    In the cases containing kx-ky, the weights are applied sequentially in
+    the pyramidal decomposition at each stage in the 2 dimensions, thus the 
+    returned weight list is twice the length.
+
+    Args:
+        rp (dictionary) -- recon parameters
+    Return:
+        weight_list (list of np.ndarray) -- list of kspace weights according
+                                            to pyramidal stages
+    """
+
+    def _haar_weights(s,w):
+        """Return weights for Haar wavelets at stage s, frequence w"""
+
+        if w!=0:
+            we = 1/np.sqrt(2**s)*(-1j*2**s*w)/2*\
+                (np.sin(2**s*w/4)/(2**s*w/4))**2*np.exp(-1j*2**s*w/2)
+        else:
+            we = 0.000001  # just something small not to divide by 0 accidently
+        return we
+
+    def _total_variation_weights(s,w):
+        pass
+
+    # init for all cases
+    weight_list = []
+    if rp['virtualcoilboost'] == True:
+        rcvrs_eff = rp['rcvrs']*2
+    else:
+        rcvrs_eff = rp['rcvrs']
+    
+    # generate for each different case
+    if rp['recontype'] == 'k-t':
+
+        kx_len = rp['fiber_shape'][1]
+        kt_len = rp['fiber_shape'][2]
+        for s in range(rp['stages']):
+            w_samples = [2*np.pi/kx_len*k for k in\
+                         range(-int(kx_len/2**(s+1)),int(kx_len/2**(s+1)))]
+            w_arr = np.array([_haar_weights(s,i) for i in w_samples],\
+                                                            dtype='complex64')
+            w_arr = w_arr[np.newaxis,:,np.newaxis]
+            w_arr = np.repeat(w_arr,rcvrs_eff,axis=0)
+            w_arr = np.repeat(w_arr,kt_len,axis=2)
+            weight_list.append(w_arr)
+
+        return weight_list
+
+    elif rp['recontype'] == 'kx-ky':
+
+        kx_len = rp['fiber_shape'][1]
+        ky_len = rp['fiber_shape'][2]
+        for s in range(rp['stages']):
+            
+            # make nd.array for dim x
+            w_samples = [2*np.pi/kx_len*k for k in\
+                         range(-int(kx_len/2**(s+1)),int(kx_len/2**(s+1)))]
+            w_arr = np.array([_haar_weights(s,i) for i in w_samples],\
+                                                            dtype='complex64')
+
+            w_arr = w_arr[np.newaxis,:,np.newaxis]
+            w_arr = np.repeat(w_arr,rcvrs_eff,axis=0)
+            w_arr = np.repeat(w_arr,ky_len//2**s,axis=2)
+            weight_list.append(w_arr)
+            # make nd.array for dim x
+            w_samples = [2*np.pi/ky_len*k for k in\
+                         range(-int(ky_len/2**(s+1)),int(ky_len/2**(s+1)))]
+            w_arr = np.array([_haar_weights(s,i) for i in w_samples],\
+                                                            dtype='complex64')
+            w_arr = w_arr[np.newaxis,np.newaxis,:]
+            w_arr = np.repeat(w_arr,rcvrs_eff,axis=0)
+            w_arr = np.repeat(w_arr,kx_len//2**s,axis=1)
+            weight_list.append(w_arr)
+
+        return weight_list
+
+    elif rp['recontype'] == 'kx-ky_angio':
+        pass
+
+def apply_kspace_weights(fiber,weight,rp):
+    """Mutiply n-D kspace elements with the approppriate weights
+
+    K-space weighing is a major part in Aloha framework. This function
+    determines the proper weighting type, creates and applies the weighting.
+    "fiber" is the n-dimensional type of a slice from the k-space.
+    Example: in k-t case, the fiber is a 3d cut from kspace along the
+    [rcvrs,pe,te] dimensions.
+
+    It!s just a multiplication though, maybe error check...
+
+    Args:
+        fiber (np.ndarray) -- input kspace part to weigh
+        rp (dictionary) -- recon parameter dictionary
+    Return:
+        fiber_weighted
+    """
+
+    pass
+
+def remove_kspace_weights(fiber,restore_center=True):
+    """Divide kspace fiber by the weights"""
+    
+    pass
+
 def construct_hankel(nd_data, rp, level=None,order=None):
     """Contruct Multilevel Hankel matrix
 
@@ -55,7 +199,6 @@ def construct_hankel(nd_data, rp, level=None,order=None):
                         col*col_size : (col+1)*col_size] = \
                                             block_vector[col+row,:,:]
 
-        #print('OK, level {}'.format(lvl))
         return hankel
 
     nd_data = np.array(nd_data, dtype='complex64')
@@ -84,7 +227,6 @@ def construct_hankel(nd_data, rp, level=None,order=None):
         hankel_rcvr = np.zeros((shape_x_rcvr,shape_y_rcvr),dtype='complex64')
         hankel_lvl1_vec = np.zeros((n,shape_x_lvl1,shape_y_lvl1),dtype='complex64')
         hankel = np.zeros((shape_x,shape_y),dtype='complex64')
-        print('hankel dest shape : {}'.format(hankel.shape))
 
         for rcvr in range(nd_data.shape[0]):
 
@@ -115,6 +257,64 @@ def deconstruct_hankel(hankel,rp):
         nd_data (np.ndarray)
 
     """
+    def _block_vector_from_col(col, height):
+        """Make vector of blocks from a higher level Hankel column"""
+
+        block_num = col.shape[0]//height
+        block_x = height
+        block_y = col.shape[1]
+        vec = np.zeros((block_num,block_x,block_y),dtype='complex')
+        for num in range(block_num):
+            vec[num,:,:] = col[num*block_x:(1+num)*block_x,:]
+        return vec
+   
+    def _deconstruct_hankel_level(hankel,m,p,factors):
+        """ Make an array of Hankel building block
+
+        This is the main local function         
+        
+        Args:
+            hankel -- 2 dim array to decompose
+            blockshape -- tuple, shape of inner matrices building up the Hankel
+        Return:
+            vec -- 3 dim array, dim 0 counts the individual blocks
+        """
+        inner_x = hankel.shape[0]//(m-p+1)
+        inner_y = hankel.shape[1]//p
+        block_vector = np.zeros((m,inner_x,inner_y),dtype='complex64')
+        for col in range(p):
+            to_add = np.zeros((m,inner_x,inner_y),dtype='complex64')
+            hankel_col = hankel[:,col*inner_y:(col+1)*inner_y]
+            vec = _block_vector_from_col(hankel_col,inner_x)
+            to_add[col:col+vec.shape[0],:,:] = vec
+            block_vector = block_vector + to_add
+        # average the lower level hankel blocks 
+        hankels_inner = _average_block_vector(block_vector,factors) 
+        return hankels_inner
+ 
+    def _average_block_vector(vec,factors):
+        """Return list of lover level hankels"""
+        if len(factors.shape) != len(vec.shape):
+            factors = factors[:,np.newaxis,np.newaxis]
+        hankels = np.divide(vec,factors)
+        return hankels
+    
+    def _make_factors(n,q):
+        """Make array of Hankel block multiplicities for averaging
+
+        Args:
+            n -- kspace length in a dimension
+            q -- annihilating filter length in same dimension
+        Return:
+            factors -- np.array of lenth n
+        """
+        factors = np.zeros(n,dtype='int') # multiplicity of 1 block
+        ramp = [i for i in range(1,q)]
+        factors[0:len(ramp)] = ramp
+        factors[n-len(ramp):] = ramp[::-1]
+        factors[factors == 0] = q
+        return factors
+
     # init
     if rp['recontype'] in ['kx-ky','k-t','kx-ky_angio']:
         level = 2
@@ -124,36 +324,28 @@ def deconstruct_hankel(hankel,rp):
     elif level == 2:
         
         # subinit level
-        kshape = rp['orig_shape']
+        kshape = rp['fiber_shape']  # kspace part to recover
         (rcvrs,m,n) = kshape
-        (p,q) = rp['filter_size']
-        cols_rcvr_lvl2 = hankel.shape[1]//kshape[0]
+        (p,q) = rp['filter_size']  # annihilating filter
+        #number of hankel hankel block columns
+        cols_rcvr_lvl2 = hankel.shape[1]//(kshape[0]*p) 
+        # zeroinit final output
         nd_data = np.zeros((rcvrs,m,n),dtype='complex64')        
-        block_vector_lvl2 = np.zeros((n,m-p+1,p),dtype='complex64')
-        block_vector_lvl1 = np.zeros((m,1,1),dtype='complex64')
-        #bshape_x = m-p+1
-        #bshape_y = p
-        factors_lvl2 = np.zeros(n,dtype='int') # multiplicity of 1 block
-        ramp = [i for i in range(1,q)]
-        factors_lvl2[0:len(ramp)] = ramp
-        factors_lvl2[n-len(ramp):] = ramp[::-1]
-        factors_lvl2[factors_lvl2 == 0] = q
 
-        factors_lvl1 = np.zeros(m,dtype='int') # multiplicity of 1 block
-        ramp = [i for i in range(1,p)]
-        factors_lvl1[0:len(ramp)] = ramp
-        factors_lvl1[m-len(ramp):] = ramp[::-1]
-        factors_lvl1[factors_lvl1 == 0] = p
+        factors_lvl2 = _make_factors(n,q) # multiplicity of 1 block
+        factors_lvl1 = _make_factors(m,p) # multiplicity of 1 block
         
         # decompose level2
         for rcvr in range(rcvrs):
 
-            for col in range(cols_rcvr_lvl2):
-                to_add = np.zeros(block_vector_lvl2.shape,dtype='complex64')
-                to_add[ind] = hankel[otherind]
-                block_vector_lvl2 = block_vector_lvl2 + to_add
-                pass
-
+            hankel_rcvr = hankel[:,rcvr*p*q:(rcvr+1)*p*q]
+            hankels_lvl1 = _deconstruct_hankel_level(hankel_rcvr,n,q,\
+                                                            factors_lvl2)
+            # decompose level1
+            for num in range(hankels_lvl1.shape[0]):
+                hank = hankels_lvl1[num,:,:]
+                elements = _deconstruct_hankel_level(hank,m,p,factors_lvl1)
+                nd_data[rcvr,:,num] = elements[:,0,0]  # dim 1,2 are single
 
         return nd_data
 
