@@ -23,7 +23,7 @@ class Test_CsTestDataGenerator(unittest.TestCase):
 
         # check existence of directory maybe
 
-    def test_testdatagen_gems(self):
+    def test_testdatagen_ge3d(self):
 
         # directories
         fid_dir = sorted(glob.glob(vj.fids+'/ge3d_s*'))[0]

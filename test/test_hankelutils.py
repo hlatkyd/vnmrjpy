@@ -21,7 +21,8 @@ class Test_hankelutils(unittest.TestCase):
         rp={'rcvrs':4,'filter_size':(11,7),'virtualcoilboost':False,\
             'recontype':'k-t','fiber_shape':(4,128,21)}
         hankel = np.random.rand(1770,308)
-        nd_data = vj.aloha.deconstruct_hankel(hankel, rp)
+        stage = 0
+        nd_data = vj.aloha.deconstruct_hankel(hankel, stage, rp)
         self.assertEqual(nd_data.shape,(4,128,21))
 
     def test_make_kspace_weights(self):

@@ -18,7 +18,8 @@ class Test_Lmafit(unittest.TestCase):
 
         lmafit = vj.aloha.Lmafit(img_masked,\
                     realtimeplot=False,\
-                    verbose=False)
+                    verbose=False,\
+                    tol=5e-3)
         X,Y,out = lmafit.solve()
         img_filled = X.dot(Y)
         mse_end = np.abs(((img_filled - img)**2).mean(axis=None))

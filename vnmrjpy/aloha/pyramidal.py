@@ -4,6 +4,117 @@ from numba import jit
 import sys
 import copy
 
+def pyramidal_kxky(kspace_fiber,weights,rp):
+    """ Pyramidal decomposition composit function for kx-ky sparsity case.
+
+    Main Aloha unit.
+    One pyramidal decomposition and matrix completion is used at each readout
+    point. Thus, the different calls for this function are independent and
+    could be passed to the grid or GPU or whatever
+
+    Args:
+        kspace_fiber
+        weights
+        rp
+    Return:
+        kspace_fiber_complete
+    """
+    kspace_fiber_complete = copy.deepcopy(kspace_fiber)
+    if rp['stages'] == 3:
+        lmafit_tolerance = vj.config['lmafit_tol']
+    else:
+        raise(Exception('no lmafit tolerance at different number of stages\
+                        than 3. please specify in config or pyramidal'))
+    for s in range(rp['stages']):
+
+        for i in range(2):
+
+            weight = weights[2*s+i]
+            # init known data for the solvers
+            fiber_known = vj.aloha.init_kspace_stage(kspace_fiber,s,rp)
+            fiber_known = vj.aloha.apply_kspace_weights(fiber_known,weight)
+            hankel_known = vj.aloha.construct_hankel(fiber_known,rp)
+            # init data to be completed
+            kspace_stage = vj.aloha.init_kspace_stage(kspace_fiber_complete,s,rp)
+            kspace_stage = vj.aloha.apply_kspace_weights(kspace_stage,weight)
+            hankel = vj.aloha.construct_hankel(kspace_stage,rp)
+           
+            if rp['solver'] == 'svt':
+                raise(Exception('not implemented'))
+            elif rp['solver'] == 'lmafit':
+                lmafit = vj.aloha.Lmafit(hankel,\
+                                        known_data=hankel_known,\
+                                        verbose=False,\
+                                        realtimeplot=False,\
+                                        tol=lmafit_tolerance[s])
+                X,Y,obj = lmafit.solve(max_iter=500)
+                admm = vj.aloha.Admm(X,Y.H,fiber_known, s,rp,\
+                                        realtimeplot=False)
+                hankel = admm.solve()
+
+            fiber = vj.aloha.deconstruct_hankel(hankel,s,rp)
+            fiber = vj.aloha.remove_kspace_weights(fiber,weight)
+            kspace_fiber_complete = vj.aloha.finish_kspace_stage(\
+                                        fiber,kspace_fiber_complete,rp)
+        
+    return kspace_fiber_complete
+            
+
+def pyramidal_kt(kspace_fiber,weights,rp):
+    """ Pyramidal decomposition composit function for k-t sparsity.
+
+    Main Aloha unit.
+    One pyramidal decomposition and matrix completion is used at each readout
+    point. Thus, the different calls for this function are independent and
+    could be passed to the grid or GPU or whatever
+
+    Args:
+        kspace_fiber
+        weights
+        rp
+    Return:
+        kspace_fiber_complete
+    """
+    kspace_fiber_complete = copy.deepcopy(kspace_fiber)
+    if rp['stages'] == 3:
+        lmafit_tolerance = vj.config['lmafit_tol']
+    else:
+        raise(Exception('no lmafit tolerance at different number of stages\
+                        than 3. please specify in config or pyramidal'))
+    for s in range(rp['stages']):
+
+        weight = weights[s]
+        # init known data for the solvers
+        fiber_known = vj.aloha.init_kspace_stage(kspace_fiber,s,rp)
+        fiber_known = vj.aloha.apply_kspace_weights(fiber_known,weight)
+        hankel_known = vj.aloha.construct_hankel(fiber_known,rp)
+        # init data to be completed
+        kspace_stage = vj.aloha.init_kspace_stage(kspace_fiber_complete,s,rp)
+        kspace_stage = vj.aloha.apply_kspace_weights(kspace_stage,weight)
+        hankel = vj.aloha.construct_hankel(kspace_stage,rp)
+       
+        if rp['solver'] == 'svt':
+            raise(Exception('not implemented'))
+        elif rp['solver'] == 'lmafit':
+            lmafit = vj.aloha.Lmafit(hankel,\
+                                    known_data=hankel_known,\
+                                    verbose=False,\
+                                    realtimeplot=False,\
+                                    tol=lmafit_tolerance[s])
+            X,Y,obj = lmafit.solve(max_iter=500)
+            admm = vj.aloha.Admm(X,Y.H,fiber_known, s,rp,\
+                                    realtimeplot=False)
+            hankel = admm.solve()
+
+        fiber = vj.aloha.deconstruct_hankel(hankel,s,rp)
+        fiber = vj.aloha.remove_kspace_weights(fiber,weight)
+        kspace_fiber_complete = vj.aloha.finish_kspace_stage(\
+                                    fiber,kspace_fiber_complete,rp)
+        
+    return kspace_fiber_complete
+            
+
+# deprecated-------------------------------------------------------------------
 def pyramidal_solve_kt(slice3d,\
                     slice3d_orig,\
                     slice3d_shape,\

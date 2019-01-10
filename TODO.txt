@@ -1,8 +1,10 @@
 1. CHECK : Mask generation; wrong oputput axes maybe
-2. DO: kx ky wavelet in aloha
-3. ONGOING : redo hankelutils
+2. ONGOING: kx ky wavelet in aloha
 4. DO: put center kspace back at finish stage
+5. DO: make aloha tests separate for each sequence
+6. DO: rewrite aloha testing, cstestio
 
 DONE:
 construct_hankel
 deconstruct_hankel
+redo hankelutils

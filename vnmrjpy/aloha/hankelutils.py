@@ -57,6 +57,8 @@ def finish_kspace_stage(kspace_stage, kspace_full, rp):
         kspace_full
     """
     
+    print(kspace_stage.shape)
+    print(kspace_full.shape)
     if rp['recontype'] in ['kx-ky','kx-ky_angio']:
          
         pe_dim = 1  #TODO dimensions are not dynamic currently
@@ -166,7 +168,7 @@ def make_kspace_weights(rp):
     elif rp['recontype'] == 'kx-ky_angio':
         pass
 
-def apply_kspace_weights(kspace_fiber,weight,rp):
+def apply_kspace_weights(kspace_fiber,weight):
     """Mutiply n-D kspace elements with the approppriate weights
 
     K-space weighing is a major part in Aloha framework. This function
@@ -184,7 +186,7 @@ def apply_kspace_weights(kspace_fiber,weight,rp):
         fiber_weighted
     """
     try:
-        weighted = np.multiply(ksapce_fiber,weight) 
+        weighted = np.multiply(kspace_fiber,weight) 
     except:
         raise
     
@@ -194,7 +196,7 @@ def remove_kspace_weights(kspace_fiber,weight):
     """Just divide kspace fiber by the weights"""
 
     try:
-        unweighted = np.divide(ksapce_fiber,weight) 
+        unweighted = np.divide(kspace_fiber,weight) 
     except:
         raise
     
@@ -291,7 +293,7 @@ def construct_hankel(nd_data, rp, level=None,order=None):
     if level == 3:
         raise(Exception('not implemented'))
 
-def deconstruct_hankel(hankel,rp):
+def deconstruct_hankel(hankel,stage,rp):
     """Make the original ndarray from the multilevel Hankel matrix.
 
     Used upon completion, and also in an ADMM averaging step
@@ -299,11 +301,21 @@ def deconstruct_hankel(hankel,rp):
     Args:
         hankel (np.ndarray) -- input hankel matrix
         rp (dictionary) -- recon parameters
-        
+        stage (int) -- current pyramidal stage
     Return:
         nd_data (np.ndarray)
 
     """
+    def _calc_fiber_shape(stage,rp):
+        """Return fiber shape at current stage as tuple"""
+
+        if rp['recontype'] in ['kx-ky','kx-ky_angio']:
+            (rcvrs,x,y) = rp['fiber_shape']
+            return (rcvrs,x//2**stage,y//2**stage)
+        elif rp['recontype'] == 'k-t':
+            (rcvrs,x,t) = rp['fiber_shape']
+            return (rcvrs,x//2**stage,t)
+
     def _block_vector_from_col(col, height):
         """Make vector of blocks from a higher level Hankel column"""
 
@@ -371,11 +383,10 @@ def deconstruct_hankel(hankel,rp):
     elif level == 2:
         
         # subinit level
-        kshape = rp['fiber_shape']  # kspace part to recover
-        (rcvrs,m,n) = kshape
+        (rcvrs,m,n) = _calc_fiber_shape(stage,rp)
         (p,q) = rp['filter_size']  # annihilating filter
         #number of hankel hankel block columns
-        cols_rcvr_lvl2 = hankel.shape[1]//(kshape[0]*p) 
+        cols_rcvr_lvl2 = hankel.shape[1]//(rcvrs*p) 
         # zeroinit final output
         nd_data = np.zeros((rcvrs,m,n),dtype='complex64')        
 

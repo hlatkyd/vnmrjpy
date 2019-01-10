@@ -11,6 +11,7 @@
 			- plotutils.py
 			- csdatagen.py
 			- skipinttools.py {skipint handling class, etc}
+			- cstestio.py
 		- recon
 			- __init__.py
 			- imake.py
@@ -25,7 +26,6 @@
 			- writefdf.py
 			- saverecon.py
 		- bin
-			- __init__.py
 			- fid2nii
 			- fid2fdf
 			- fdf2nii
@@ -34,6 +34,7 @@
 			- pget
 			- pyrecon
 			- gskipint
+			- pp2kmask (wtf is this?)
 		- aloha
 			- __init__.py
 			- hankelutils.py

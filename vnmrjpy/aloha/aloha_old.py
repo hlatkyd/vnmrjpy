@@ -127,7 +127,6 @@ class Aloha():
         self.rp = _get_reconpar(self.recontype,reconpar, kspace_cs.shape)
         self.conf = vj.config
         self.kspace_cs = np.array(kspace_cs, dtype='complex64')
-        self.weights = vj.aloha.make_kspace_weights(self.rp)
 
     def recon(self):
         """Main reconstruction method for Aloha
@@ -136,7 +135,7 @@ class Aloha():
             kspace_completed (np.ndarray) : full, inferred kspace
         """
         #----------------------------INIT---------------------------------
-        def _virtualcoilboost_(data):
+        def virtualcoilboost_(data):
             """virtual coil data augmentation"""
             #TODO sort by apptype
             if self.p['apptype'] in ['im2D','im2Dfse','im2Depi']:
@@ -150,38 +149,81 @@ class Aloha():
 
             return np.concatenate((data,conj_trans_data),\
                                 axis=self.conf['rcvr_dim'])
-        # init output data
+
         if self.rp['virtualcoilboost'] == False:
             kspace_completed = copy.deepcopy(self.kspace_cs)
         elif self.rp['virtualcoilboost'] == True:
             self.kspace_cs = virtualcoilboost_(self.kspace_cs)
+            print(self.kspace_cs.shape)
             kspace_completed = copy.deepcopy(self.kspace_cs)
-
-        # init weights
 
         #------------------------------------------------------------------
         #           2D :    k-t ; kx-ky ; kx-ky_angio
         #------------------------------------------------------------------
         if self.rp['recontype'] in ['k-t','kx-ky','kx-ky_angio']:
-            print('Processing Aloha reconstruction...')
+
+            #----------------------MAIN INIT----------------------------    
+            if self.rp['recontype'] == 'k-t':
+
+                slice3d_shape = (self.kspace_cs.shape[self.conf['rcvr_dim']],\
+                                self.kspace_cs.shape[self.conf['pe_dim']],\
+                                self.kspace_cs.shape[self.conf['et_dim']])
+
+                x_len = self.kspace_cs.shape[self.rp['cs_dim'][0]]
+                t_len = self.kspace_cs.shape[self.rp['cs_dim'][1]]
+                #each element of weight list is an array of weights in stage s
+                weights_list = vj.aloha.make_pyramidal_weights_kxt(\
+                                        x_len, t_len, self.rp)
+                factors = vj.aloha.make_hankel_decompose_factors(\
+                                        slice3d_shape, self.rp)
+            
+            if self.rp['recontype'] in ['kx-ky_angio','kx-ky']:           
+
+                slice3d_shape = (self.kspace_cs.shape[self.conf['rcvr_dim']],\
+                                self.kspace_cs.shape[self.conf['pe_dim']],\
+                                self.kspace_cs.shape[self.conf['pe2_dim']])
+
+                x_len = self.kspace_cs.shape[self.rp['cs_dim'][0]]
+                y_len = self.kspace_cs.shape[self.rp['cs_dim'][1]]
+                #each element of weight list is an array of weights in stage s
+                if self.rp['recontype'] == 'kx-ky_angio':
+                    weights_list = vj.aloha.make_pyramidal_weights_kxkyangio(\
+                                        x_len, y_len, self.rp)
+                elif self.rp['recontype'] == 'kx-ky':
+                    weights_list = vj.aloha.make_pyramidal_weights_kxky(\
+                                        x_len, y_len, self.rp)
+                else:
+                    pass
+                factors = vj.aloha.make_hankel_decompose_factors(\
+                                        slice3d_shape, self.rp)
+            
             #------------------MAIN ITERATION----------------------------    
             for slc in range(self.kspace_cs.shape[3]):
 
                 for x in range(self.kspace_cs.shape[self.rp['cs_dim'][0]]):
 
-                    fiber3d = self.kspace_cs[:,:,x,slc,:]
+                    slice3d = self.kspace_cs[:,:,x,slc,:]
+                    slice3d_orig = copy.deepcopy(slice3d)
                     # main call for solvers
                     if self.rp['recontype'] == 'k-t':
-                        fiber3d = vj.aloha.pyramidal_kt(fiber3d,\
-                                                        self.weights,\
+                        slice3d_completed = vj.aloha.pyramidal_solve_kt(\
+                                                        slice3d,\
+                                                        slice3d_orig,\
+                                                        slice3d_shape,\
+                                                        weights_list,\
+                                                        factors,\
                                                         self.rp)
                     elif self.rp['recontype'] in ['kx-ky_angio','kx-ky']:
-                        fiber3d = vj.aloha.pyramidal_kxky(fiber3d,\
-                                                        self.weights,\
+                        slice3d_completed = vj.aloha.pyramidal_solve_kxky(\
+                                                        slice3d,\
+                                                        slice3d_orig,\
+                                                        slice3d_shape,\
+                                                        weights_list,\
+                                                        factors,\
                                                         self.rp)
                     else:
-                        raise(Exception('not implemented'))
-                    kspace_completed[:,:,x,slc,:] = fiber3d
+                        pass
+                    kspace_completed[:,:,x,slc,:] = slice3d_completed
             
                     print('slice {}/{} line {}/{} done.'.format(\
                                 slc+1,self.kspace_cs.shape[3],\
@@ -189,8 +231,3 @@ class Aloha():
 
             return kspace_completed
 
-        #------------------------------------------------------------------
-        #                        3D :    kx-ky-t
-        #------------------------------------------------------------------
-        if self.rp['recontype'] in ['kx-ky-t']:
-            raise(Exception('dream on...'))

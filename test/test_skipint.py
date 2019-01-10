@@ -36,3 +36,7 @@ class Test_SkipintGenerator(unittest.TestCase):
         self.assertEqual(len(kmask.shape),4)
     
         nib.viewers.OrthoSlicer3D(kmask).show()
+
+    def test_skiptab_ge3d(self):
+        """ Generate skiptab"""
+        pass
