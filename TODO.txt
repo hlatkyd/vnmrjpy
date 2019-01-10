@@ -1,6 +1,7 @@
 1. CHECK : Mask generation; wrong oputput axes maybe
 2. DO: kx ky wavelet in aloha
-3. GOING : redo hankelutils
+3. ONGOING : redo hankelutils
+4. DO: put center kspace back at finish stage
 
 DONE:
 construct_hankel

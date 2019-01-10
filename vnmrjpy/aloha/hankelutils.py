@@ -10,41 +10,79 @@ Functions for handling Hankel matrices in various ALOHA implementations
 
 DTYPE = 'complex64'
 
-def init_kspace_stage(kspace_prev_stage,stage,rp):
+def init_kspace_stage(kspace_fiber,stage,rp):
     """Setup kspace for current pyramidal stage
 
-    At each stage except 0, kspace data is taken from previos completed stage
-    
-
+    At each stage except 0, kspace data is taken from previos completed stage.
+    In wavelet sparse images the pyramidal decomposition means taking the
+    center part of the kspace, the size corresponds to the current stage.
+   
+    Args:
+        kspace_fiber (np.ndarray) --  full kspace fiber 
+        stage (int) -- stage number, first stage is 0
+        rp (dict) -- recon parameters
+    Return:
+        kspace_init (np.ndarray) --  
     """
     if stage == 0:
-        return kspace_prev_stage
+        return kspace_fiber
          
     if rp['recontype'] in ['kx-ky','kx-ky_angio']: 
 
-        kx_ind = kspace_prev_stage.shape[1]
-        ky_ind = kspace_prev_stage.shape[2]
-        kspace_init = kspace_prev_stage[:,kx_ind//2-kx_ind//2**(stage+1): \
-                                          kx_ind//2+kx_ind//2**(stage+1),\
-                                        ky_ind//2-ky_ind//2**(stage+1):\
-                                        ky_ind//2+ky_ind//2**(stage+1)] 
+        kx_ind = kspace_fiber.shape[1]
+        ky_ind = kspace_fiber.shape[2]
+        kspace_init = kspace_fiber[:,kx_ind//2-kx_ind//2**(stage+1): \
+                                    kx_ind//2+kx_ind//2**(stage+1),\
+                                    ky_ind//2-ky_ind//2**(stage+1):\
+                                    ky_ind//2+ky_ind//2**(stage+1)] 
     elif rp['recontype'] == 'k-t':
-        kx_ind = kspace_prev_stage.shape[1]
-        kspace_init = kspace_prev_stage[:,kx_ind//2-kx_ind//2**(stage+1): \
-                                          kx_ind//2+kx_ind//2**(stage+1),:] 
+        kx_ind = kspace_fiber.shape[1]
+        kspace_init = kspace_fiber[:,kx_ind//2-kx_ind//2**(stage+1): \
+                                    kx_ind//2+kx_ind//2**(stage+1),:] 
         
     else:
         raise(Exception('not implemented'))
 
-
     return kspace_init
 
-def finalize_kspace_stage():
+def finish_kspace_stage(kspace_stage, kspace_full, rp):
     """Complete pyramidal stage, put inferred data back into original position
 
+    TODO : maybe put known center data back here
 
+    Args:
+        kspace_stage
+        kspace_full
+    Return:
+        kspace_full
     """
-    pass
+    
+    if rp['recontype'] in ['kx-ky','kx-ky_angio']:
+         
+        pe_dim = 1  #TODO dimensions are not dynamic currently
+        pe2_dim = 2
+
+        ind_start = kspace_full.shape[pe_dim]//2 - kspace_stage.shape[pe_dim]//2
+        ind_end = kspace_full.shape[pe_dim]//2 + kspace_stage.shape[pe_dim]//2
+        ind2_start = kspace_full.shape[pe2_dim]//2 - kspace_stage.shape[pe2_dim]//2
+        ind2_end = kspace_full.shape[pe2_dim]//2 + kspace_stage.shape[pe2_dim]//2
+
+        kspace_full[:,ind_start:ind_end,ind2_start:ind2_end] = kspace_stage
+
+        return kspace_full
+
+    elif rp['recontype'] == 'k-t':
+
+        pe_dim = 1  #TODO dimensions are not dynamic currently
+
+        ind_start = kspace_full.shape[pe_dim]//2 - kspace_stage.shape[pe_dim]//2
+        ind_end = kspace_full.shape[pe_dim]//2 + kspace_stage.shape[pe_dim]//2
+        kspace_full[:,ind_start:ind_end,:] = kspace_stage
+
+        return kspace_full
+    
+    else:
+        raise(Exception('not implemented yet'))
 
 def make_kspace_weights(rp):
     """Create weight data for kspace weighting
@@ -128,7 +166,7 @@ def make_kspace_weights(rp):
     elif rp['recontype'] == 'kx-ky_angio':
         pass
 
-def apply_kspace_weights(fiber,weight,rp):
+def apply_kspace_weights(kspace_fiber,weight,rp):
     """Mutiply n-D kspace elements with the approppriate weights
 
     K-space weighing is a major part in Aloha framework. This function
@@ -145,13 +183,22 @@ def apply_kspace_weights(fiber,weight,rp):
     Return:
         fiber_weighted
     """
-
-    pass
-
-def remove_kspace_weights(fiber,restore_center=True):
-    """Divide kspace fiber by the weights"""
+    try:
+        weighted = np.multiply(ksapce_fiber,weight) 
+    except:
+        raise
     
-    pass
+    return weighted 
+
+def remove_kspace_weights(kspace_fiber,weight):
+    """Just divide kspace fiber by the weights"""
+
+    try:
+        unweighted = np.divide(ksapce_fiber,weight) 
+    except:
+        raise
+    
+    return unweighted 
 
 def construct_hankel(nd_data, rp, level=None,order=None):
     """Contruct Multilevel Hankel matrix
