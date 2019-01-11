@@ -57,8 +57,6 @@ def finish_kspace_stage(kspace_stage, kspace_full, rp):
         kspace_full
     """
     
-    print(kspace_stage.shape)
-    print(kspace_full.shape)
     if rp['recontype'] in ['kx-ky','kx-ky_angio']:
          
         pe_dim = 1  #TODO dimensions are not dynamic currently
@@ -166,7 +164,7 @@ def make_kspace_weights(rp):
         return weight_list
 
     elif rp['recontype'] == 'kx-ky_angio':
-        pass
+        raise(Exception('not implemented'))
 
 def apply_kspace_weights(kspace_fiber,weight):
     """Mutiply n-D kspace elements with the approppriate weights

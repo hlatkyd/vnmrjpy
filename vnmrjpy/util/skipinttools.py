@@ -194,6 +194,8 @@ class SkipintGenerator():
             for t in range(self.shape[self.conf['et_dim']-1]):
 
                 kspace_mask[:,:,:,t] = _make_3d_mask(num)
+            #TODO currenty this is a debugging hack. better do it properly 
+            kspace_mask = np.swapaxes(kspace_mask,1,2)
         else:
             raise(Exception('wrong dimension maybe'))
 

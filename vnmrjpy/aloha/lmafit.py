@@ -1,6 +1,7 @@
 import copy
 import vnmrjpy as vj
 import numpy as np
+import matplotlib.pyplot as plt
 
 class Lmafit():
     """Low-rank matrix fitting algorithm

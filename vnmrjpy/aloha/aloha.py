@@ -3,6 +3,7 @@ import vnmrjpy as vj
 import timeit
 import time
 import copy
+import matplotlib.pyplot as plt
 
 class Aloha():
     """Aloha framework for Compressed Sensing
@@ -157,35 +158,53 @@ class Aloha():
             self.kspace_cs = virtualcoilboost_(self.kspace_cs)
             kspace_completed = copy.deepcopy(self.kspace_cs)
 
-        # init weights
-
         #------------------------------------------------------------------
-        #           2D :    k-t ; kx-ky ; kx-ky_angio
+        #                        1D :    kx
         #------------------------------------------------------------------
-        if self.rp['recontype'] in ['k-t','kx-ky','kx-ky_angio']:
+        if self.rp['recontype'] in ['kx']:
+            raise(Exception('dream on...'))
+        #------------------------------------------------------------------
+        #                        2D :    k-t
+        #------------------------------------------------------------------
+        if self.rp['recontype'] in ['k-t']:
             print('Processing Aloha reconstruction...')
             #------------------MAIN ITERATION----------------------------    
             for slc in range(self.kspace_cs.shape[3]):
 
                 for x in range(self.kspace_cs.shape[self.rp['cs_dim'][0]]):
 
-                    fiber3d = self.kspace_cs[:,:,x,slc,:]
                     # main call for solvers
-                    if self.rp['recontype'] == 'k-t':
-                        fiber3d = vj.aloha.pyramidal_kt(fiber3d,\
-                                                        self.weights,\
-                                                        self.rp)
-                    elif self.rp['recontype'] in ['kx-ky_angio','kx-ky']:
-                        fiber3d = vj.aloha.pyramidal_kxky(fiber3d,\
-                                                        self.weights,\
-                                                        self.rp)
-                    else:
-                        raise(Exception('not implemented'))
+                    fiber3d = self.kspace_cs[:,:,x,slc,:]
+                    fiber3d = vj.aloha.pyramidal_kt(fiber3d,\
+                                                    self.weights,\
+                                                    self.rp)
                     kspace_completed[:,:,x,slc,:] = fiber3d
             
                     print('slice {}/{} line {}/{} done.'.format(\
                                 slc+1,self.kspace_cs.shape[3],\
                                 x+1,self.kspace_cs.shape[2]))
+
+            return kspace_completed
+        #TODO kxky
+        #------------------------------------------------------------------
+        #                2D :    kx-ky ; kx-ky_angio
+        #------------------------------------------------------------------
+        if self.rp['recontype'] in ['kx-ky','kx-ky_angio']:
+            print('Processing Aloha reconstruction...')
+            #------------------MAIN ITERATION----------------------------    
+            for time in range(self.kspace_cs.shape[4]):
+
+                for slc in range(self.kspace_cs.shape[self.rp['cs_dim'][1]]):
+
+                    fiber3d = self.kspace_cs[:,:,slc,:,time]
+                    fiber3d = vj.aloha.pyramidal_kxky(fiber3d,\
+                                                    self.weights,\
+                                                    self.rp)
+                    kspace_completed[:,:,slc,:,time] = fiber3d
+            
+                    print('slice {}/{} line {}/{} done.'.format(\
+                                slc+1,self.kspace_cs.shape[2],\
+                                time+1,self.kspace_cs.shape[4]))
 
             return kspace_completed
 

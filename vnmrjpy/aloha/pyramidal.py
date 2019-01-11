@@ -3,6 +3,7 @@ import vnmrjpy as vj
 from numba import jit
 import sys
 import copy
+import matplotlib.pyplot as plt
 
 def pyramidal_kxky(kspace_fiber,weights,rp):
     """ Pyramidal decomposition composit function for kx-ky sparsity case.
@@ -38,6 +39,7 @@ def pyramidal_kxky(kspace_fiber,weights,rp):
             kspace_stage = vj.aloha.init_kspace_stage(kspace_fiber_complete,s,rp)
             kspace_stage = vj.aloha.apply_kspace_weights(kspace_stage,weight)
             hankel = vj.aloha.construct_hankel(kspace_stage,rp)
+            #plt.imshow(np.absolute(hankel))
            
             if rp['solver'] == 'svt':
                 raise(Exception('not implemented'))
@@ -47,7 +49,7 @@ def pyramidal_kxky(kspace_fiber,weights,rp):
                                         verbose=False,\
                                         realtimeplot=False,\
                                         tol=lmafit_tolerance[s])
-                X,Y,obj = lmafit.solve(max_iter=500)
+                X,Y,obj = lmafit.solve(max_iter=100)
                 admm = vj.aloha.Admm(X,Y.H,fiber_known, s,rp,\
                                         realtimeplot=False)
                 hankel = admm.solve()
