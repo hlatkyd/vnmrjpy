@@ -23,7 +23,7 @@ class AlohaTest():
         if data == 'mems':
             seqdir = '/mems_s_2018111301_axial_0_0_0_01.cs'
         elif data == 'angio':
-            seqdir = '/ge3d_angio_HD_s_2018072604_HD_01.cs'
+            seqdir = '/ge3d_angio_HD_s_2018072604_HD_01_red8.cs'
         elif data == 'gems':
             seqdir = '/gems_s_2018111301_axial90_0_90_0_01.cs'
         elif data == 'ge3d':

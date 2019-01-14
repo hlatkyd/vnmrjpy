@@ -49,9 +49,12 @@ class Lmafit():
         datamask[datamask != 0+0*1j] = 1
         datanrm = np.linalg.norm(init_data,'fro')
         # init
-        Z = np.matrix(init_data)
-        X = np.matrix(np.zeros((m,k),dtype='complex64'))
-        Y = np.matrix(np.eye(k,n,dtype='complex64'))
+        #Z = np.matrix(init_data)
+        Z = init_data
+        #X = np.matrix(np.zeros((m,k),dtype='complex64'))
+        #TODO check removed matrix ok
+        X = np.zeros((m,k),dtype='complex64')
+        Y = np.eye(k,n,dtype='complex64')
         Res = np.multiply(init_data,datamask) - known_data
         res = datanrm
         reschg_tol = 0.5*tol
@@ -71,11 +74,11 @@ class Lmafit():
             self.rtplot = vj.util.RealTimeImshow(np.absolute(init_data))
 
 
-        self.initpars = (np.matrix(init_data),np.matrix(known_data),\
+        self.initpars = (init_data,known_data,\
                         m,n,k,tol,rank_strategy,datanrm,\
                         Z,X,Y,Res,res,reschg_tol,alf,increment,itr_rank,\
                         minitr_reduce_rank,maxitr_reduce_rank,tau_limit,\
-                        np.matrix(datamask),rank_incr,rank_max)
+                        datamask,rank_incr,rank_max)
 
     def solve(self,max_iter=100):
         """Main iteration
@@ -107,8 +110,10 @@ class Lmafit():
 
             m = X.shape[0]
             n = Y.shape[1]
-            X_new = np.matrix(np.zeros((m,k_new),dtype='complex64'))
-            Y_new = np.matrix(np.eye(k_new,n,dtype='complex64'))            
+            #X_new = np.matrix(np.zeros((m,k_new),dtype='complex64'))
+            #Y_new = np.matrix(np.eye(k_new,n,dtype='complex64'))            
+            X_new = np.zeros((m,k_new),dtype='complex64')
+            Y_new = np.eye(k_new,n,dtype='complex64')          
             X_new[:,:k] = X
             Y_new[:k,:] = Y
             Z_new = X.dot(Y)
@@ -133,9 +138,9 @@ class Lmafit():
             Res0 = copy.deepcopy(Res)
             res0 = copy.deepcopy(res)
             Z0 = copy.deepcopy(Z)
-            X = Z.dot(Y.H)
+            X = Z.dot(Y.conj().T)
             X, R = np.linalg.qr(X)
-            Y = X.H.dot(Z)
+            Y = X.conj().T.dot(Z)
             Z = X.dot(Y)
 
             Res = np.multiply(known_data-Z,datamask)

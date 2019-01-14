@@ -11,13 +11,13 @@ class CsTestDataGenerator():
         kspace_imag_ch[n].nii.gz
         kspace_real_ch[n].nii.gz
     """
-    def __init__(self,fid,procpar):
+    def __init__(self,fid,procpar,reduction=4):
         """makes ksapce, imgspace, mask data from fid
 
         FidReader, KspaceMaker should be available for the sequence
         """    
         p = vj.io.ProcparReader(procpar).read()
-        gen = vj.util.SkipintGenerator(procpar=procpar,reduction=4)
+        gen = vj.util.SkipintGenerator(procpar=procpar,reduction=reduction)
         self.kspace_mask = gen.generate_kspace_mask()
         fid_data, fid_header = vj.io.FidReader(fid,procpar).read()
         self.kspace = vj.recon.KspaceMaker(fid_data, fid_header, procpar).make()

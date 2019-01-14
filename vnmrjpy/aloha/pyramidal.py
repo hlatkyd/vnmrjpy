@@ -23,6 +23,9 @@ def pyramidal_kxky(kspace_fiber,weights,rp):
     kspace_fiber_complete = copy.deepcopy(kspace_fiber)
     if rp['stages'] == 3:
         lmafit_tolerance = vj.config['lmafit_tol']
+    #TODO ugly hack correct this....
+    elif rp['stages'] == 1:
+        lmafit_tolerance = [vj.config['lmafit_tol'][1]]
     else:
         raise(Exception('no lmafit tolerance at different number of stages\
                         than 3. please specify in config or pyramidal'))
@@ -50,7 +53,7 @@ def pyramidal_kxky(kspace_fiber,weights,rp):
                                         realtimeplot=False,\
                                         tol=lmafit_tolerance[s])
                 X,Y,obj = lmafit.solve(max_iter=100)
-                admm = vj.aloha.Admm(X,Y.H,fiber_known, s,rp,\
+                admm = vj.aloha.Admm(X,Y.conj().T,fiber_known, s,rp,\
                                         realtimeplot=False)
                 hankel = admm.solve()
 
@@ -104,7 +107,7 @@ def pyramidal_kt(kspace_fiber,weights,rp):
                                     realtimeplot=False,\
                                     tol=lmafit_tolerance[s])
             X,Y,obj = lmafit.solve(max_iter=500)
-            admm = vj.aloha.Admm(X,Y.H,fiber_known, s,rp,\
+            admm = vj.aloha.Admm(X,Y.conj().T,fiber_known, s,rp,\
                                     realtimeplot=False)
             hankel = admm.solve()
 

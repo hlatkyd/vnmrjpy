@@ -97,6 +97,13 @@ def make_kspace_weights(rp):
         weight_list (list of np.ndarray) -- list of kspace weights according
                                             to pyramidal stages
     """
+    def _tv_weights(w):
+
+        if w != 0:
+            we = 1j*w
+        else:
+            we = 0.000001
+        return we
 
     def _haar_weights(s,w):
         """Return weights for Haar wavelets at stage s, frequence w"""
@@ -107,9 +114,6 @@ def make_kspace_weights(rp):
         else:
             we = 0.000001  # just something small not to divide by 0 accidently
         return we
-
-    def _total_variation_weights(s,w):
-        pass
 
     # init for all cases
     weight_list = []
@@ -164,7 +168,31 @@ def make_kspace_weights(rp):
         return weight_list
 
     elif rp['recontype'] == 'kx-ky_angio':
-        raise(Exception('not implemented'))
+        
+        kx_len = rp['fiber_shape'][1]
+        ky_len = rp['fiber_shape'][2]
+        
+        # make nd.array for dim x
+        w_samples = [2*np.pi/kx_len*k for k in\
+                     range(-int(kx_len/2),int(kx_len/2))]
+        w_arr = np.array([_tv_weights(i) for i in w_samples],\
+                                                        dtype='complex64')
+
+        w_arr = w_arr[np.newaxis,:,np.newaxis]
+        w_arr = np.repeat(w_arr,rcvrs_eff,axis=0)
+        w_arr = np.repeat(w_arr,ky_len,axis=2)
+        weight_list.append(w_arr)
+        # make nd.array for dim x
+        w_samples = [2*np.pi/ky_len*k for k in\
+                     range(-int(ky_len/2),int(ky_len/2))]
+        w_arr = np.array([_tv_weights(i) for i in w_samples],\
+                                                        dtype='complex64')
+        w_arr = w_arr[np.newaxis,np.newaxis,:]
+        w_arr = np.repeat(w_arr,rcvrs_eff,axis=0)
+        w_arr = np.repeat(w_arr,kx_len,axis=1)
+        weight_list.append(w_arr)
+
+        return weight_list
 
 def apply_kspace_weights(kspace_fiber,weight):
     """Mutiply n-D kspace elements with the approppriate weights

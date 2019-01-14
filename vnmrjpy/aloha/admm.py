@@ -31,8 +31,10 @@ class Admm():
         """
         #TODO change the old hankel compose-decompose to the new one
         fiber_shape = rp['fiber_shape']
-        U = np.matrix(U)
-        V = np.matrix(V)
+        #removed np matrix
+        # a.H syntax is changed to a.conj().T
+        #U = np.matrix(U)
+        #V = np.matrix(V)
         # make ankel mask out of known elmenets
         hankel_mask = np.absolute(vj.aloha.construct_hankel(fiber_stage_known,rp))
         hankel_mask[hankel_mask != 0] = 1
@@ -44,7 +46,7 @@ class Admm():
         # real time plotting for debugging purposes
         self.realtimeplot = realtimeplot
         if realtimeplot == True:
-            self.rtplot = vj.util.RealTimeImshow(np.absolute(U.dot(V.H)))
+            self.rtplot = vj.util.RealTimeImshow(np.absolute(U.dot(V.conj().T)))
 
         # putting initpars into tuple
         self.initpars = (U,V,fiber_stage_known,stage,rp,mu,noiseless)
@@ -57,14 +59,14 @@ class Admm():
         """
         (U,V,fiber_stage,s,rp,mu,noiseless) = self.initpars
 
-        hankel = np.matrix(U.dot(V.H))
+        hankel = U.dot(V.conj().T)
 
         fiber_orig_part = copy.deepcopy(fiber_stage)
         # init lagrangian update
-        lagr = np.matrix(np.zeros(hankel.shape,dtype='complex64'))
+        lagr = np.zeros(hankel.shape,dtype='complex64')
         #lagr = copy.deepcopy(hankel)
-        us = (U.H.dot(U)).shape
-        vs = (V.H.dot(V)).shape
+        us = (U.conj().T.dot(U)).shape
+        vs = (V.conj().T.dot(V)).shape
         Iu = np.eye(us[0],us[1],dtype='complex64')
         Iv = np.eye(vs[0],vs[0],dtype='complex64')
 
@@ -73,19 +75,22 @@ class Admm():
 
             # taking the averages from tha hankel structure and rebuild
             hankel_inferred_part = np.multiply(\
-                                U.dot(V.H)-lagr,self.hankel_mask_inv)  
+                                U.dot(V.conj().T)-lagr,self.hankel_mask_inv)  
             fiber_inferred_part = vj.aloha.deconstruct_hankel(\
                                 hankel_inferred_part,s,rp)
 
             fiber = fiber_orig_part + fiber_inferred_part
             hankel = vj.aloha.construct_hankel(fiber,rp)
             # updating U,V and the lagrangian
-            U = mu*(hankel+lagr).dot(V).dot(np.linalg.inv(Iv+mu*V.H.dot(V)))
-            V = mu*((hankel+lagr).H).dot(U).dot(np.linalg.inv(Iu+mu*U.H.dot(U)))
-            lagr = hankel - U.dot(V.H) + lagr
+            #TODO consider multidot....
+            U = mu*(hankel+lagr).dot(V).dot(\
+                                np.linalg.inv(Iv+mu*V.conj().T.dot(V)))
+            V = mu*((hankel+lagr).conj().T).dot(U).dot(\
+                                np.linalg.inv(Iu+mu*U.conj().T.dot(U)))
+            lagr = hankel - U.dot(V.conj().T) + lagr
 
             if self.realtimeplot == True:
-                self.rtplot.update_data(np.absolute(U.dot(V.H)))
+                self.rtplot.update_data(np.absolute(U.dot(V.conj().T)))
 
-        return U.dot(V.H)
+        return U.dot(V.conj().T)
     

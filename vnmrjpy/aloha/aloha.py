@@ -185,11 +185,32 @@ class Aloha():
                                 x+1,self.kspace_cs.shape[2]))
 
             return kspace_completed
-        #TODO kxky
+        #TODO reconsider merging angio and kxky
         #------------------------------------------------------------------
-        #                2D :    kx-ky ; kx-ky_angio
+        #                     2D :     kx-ky_angio
         #------------------------------------------------------------------
-        if self.rp['recontype'] in ['kx-ky','kx-ky_angio']:
+        if self.rp['recontype'] in ['kx-ky_angio']:
+            print('Processing Aloha reconstruction...')
+            #------------------MAIN ITERATION----------------------------    
+            for time in range(self.kspace_cs.shape[4]):
+
+                for slc in range(self.kspace_cs.shape[self.rp['cs_dim'][1]]):
+
+                    fiber3d = self.kspace_cs[:,:,slc,:,time]
+                    fiber3d = vj.aloha.pyramidal_kxky(fiber3d,\
+                                                    self.weights,\
+                                                    self.rp)
+                    kspace_completed[:,:,slc,:,time] = fiber3d
+            
+                    print('slice {}/{} line {}/{} done.'.format(\
+                                slc+1,self.kspace_cs.shape[2],\
+                                time+1,self.kspace_cs.shape[4]))
+
+            return kspace_completed
+        #------------------------------------------------------------------
+        #                         2D :    kx-ky
+        #------------------------------------------------------------------
+        if self.rp['recontype'] in ['kx-ky']:
             print('Processing Aloha reconstruction...')
             #------------------MAIN ITERATION----------------------------    
             for time in range(self.kspace_cs.shape[4]):
