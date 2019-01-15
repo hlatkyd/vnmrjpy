@@ -9,3 +9,4 @@ from .aloha import *
 from .lmafit import *
 from .admm import *
 from .pyramidal import *
+from .svt import *

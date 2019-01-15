@@ -7,19 +7,19 @@ import copy
 import matplotlib.pyplot as plt
 
 # test on small number of slices only for 'speed'
-SLC = 'all'
-SLC = 60
+#SLC = 'all'
+SLC = 'center'
 SLCNUM = 1
 
-class Test_Aloha_ge3d(unittest.TestCase):
+class Test_Aloha_mems(unittest.TestCase):
 
-    def test_ge3d(self):
+    def test_mems(self):
    
         slc = SLC  # slice
         slcnum = SLCNUM  #number of slices
         alohatest = vj.util.AlohaTest(slc,slcnum) 
         kspace_orig, kspace_cs, affine, procpar, savedir = \
-                                        alohatest.load_test_cs_data('ge3d')
+                                        alohatest.load_test_cs_data('mems')
 
         #plt.imshow(np.absolute(kspace_cs[0,:,40,:,0]))
         #plt.show()        

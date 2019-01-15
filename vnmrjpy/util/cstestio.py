@@ -15,20 +15,20 @@ class AlohaTest():
         self.slc = slc
         self.slcnum = slcnum
 
-    def load_test_cs_data(self,data):
+    def load_test_cs_data(self,datatype):
 
         SLC = self.slc
         SLCNUM = self.slcnum
 
-        if data == 'mems':
+        if datatype == 'mems':
             seqdir = '/mems_s_2018111301_axial_0_0_0_01.cs'
-        elif data == 'angio':
+        elif datatype == 'angio':
             seqdir = '/ge3d_angio_HD_s_2018072604_HD_01_red8.cs'
-        elif data == 'gems':
+        elif datatype == 'gems':
             seqdir = '/gems_s_2018111301_axial90_0_90_0_01.cs'
-        elif data == 'ge3d':
+        elif datatype == 'ge3d':
             seqdir = '/ge3d_s_2018111301_axial_0_0_0_01.cs'
-        elif data == None:
+        elif datatype == None:
             raise(Exception('Testdata not specified'))
 
         testdir = vj.cs+seqdir
@@ -68,12 +68,40 @@ class AlohaTest():
                     affine,\
                     procpar,\
                     savedir)
+        
+        # these are different depending on data
+        elif SLC == 'center':
+            if datatype in ['mems']:
+                center = kspace_orig.shape[vj.config['slc_dim']]//2
+                if SLCNUM > 1:
+                    num1 = SLCNUM//2
+                    num2 = SLCNUM//2
+                else:
+                    num1 = 1
+                    num2 = 0
+                return (kspace_orig[...,center-num1:center+num2,:],\
+                        kspace_cs[...,center-num1:center+num2,:],\
+                        affine,\
+                        procpar,\
+                        savedir)
+            else:
+                raise(Exception('not implemented'))
+        # if slice and slice number is specified
         else:
-            return (kspace_orig[...,SLC:SLC+SLCNUM,:],\
-                    kspace_cs[...,SLC:SLC+SLCNUM,:],\
-                    affine,\
-                    procpar,\
-                    savedir)
+            if datatype in ['mems']:
+                return (kspace_orig[...,SLC:SLC+SLCNUM,:],\
+                        kspace_cs[...,SLC:SLC+SLCNUM,:],\
+                        affine,\
+                        procpar,\
+                        savedir)
+            elif datatype in ['angio','ge3d']:
+                return (kspace_orig[:,:,SLC:SLC+SLCNUM,:,:],\
+                        kspace_cs[:,:,SLC:SLC+SLCNUM,:,:],\
+                        affine,\
+                        procpar,\
+                        savedir)
+            else:
+                raise(Exception('not implemented'))
 
     def save_test_cs_results(self,procpar,\
                                 affine,\

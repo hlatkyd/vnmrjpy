@@ -49,6 +49,8 @@ def finish_kspace_stage(kspace_stage, kspace_full, rp):
     """Complete pyramidal stage, put inferred data back into original position
 
     TODO : maybe put known center data back here
+    currently 4 center lines ar placed back
+    in kxky a rectangle is used instead of circle
 
     Args:
         kspace_stage
@@ -61,23 +63,37 @@ def finish_kspace_stage(kspace_stage, kspace_full, rp):
          
         pe_dim = 1  #TODO dimensions are not dynamic currently
         pe2_dim = 2
-
+        # center coordinates for putting bakc original center data
+        center_ind_pe = kspace_full.shape[pe_dim]//2-1
+        center_ind_pe2 = kspace_full.shape[pe2_dim]//2-1
+        # coordinates for stage size
         ind_start = kspace_full.shape[pe_dim]//2 - kspace_stage.shape[pe_dim]//2
         ind_end = kspace_full.shape[pe_dim]//2 + kspace_stage.shape[pe_dim]//2
         ind2_start = kspace_full.shape[pe2_dim]//2 - kspace_stage.shape[pe2_dim]//2
         ind2_end = kspace_full.shape[pe2_dim]//2 + kspace_stage.shape[pe2_dim]//2
+        # saving original center
+        center = copy.deepcopy(kspace_full[:,center_ind_pe-2:center_ind_pe+2,\
+                                center_ind_pe2-2:center_ind_pe2+2])
 
         kspace_full[:,ind_start:ind_end,ind2_start:ind2_end] = kspace_stage
 
+        # putting back known center
+
+        kspace_full[:,center_ind_pe-2:center_ind_pe+2,\
+                        center_ind_pe2-2:center_ind_pe2+2] = center
         return kspace_full
 
     elif rp['recontype'] == 'k-t':
 
         pe_dim = 1  #TODO dimensions are not dynamic currently
+        center_ind_pe = kspace_full.shape[pe_dim]//2-1
 
         ind_start = kspace_full.shape[pe_dim]//2 - kspace_stage.shape[pe_dim]//2
         ind_end = kspace_full.shape[pe_dim]//2 + kspace_stage.shape[pe_dim]//2
+        #original center
+        center = copy.deepcopy(kspace_full[:,center_ind_pe-2:center_ind_pe+2,:])
         kspace_full[:,ind_start:ind_end,:] = kspace_stage
+        kspace_full[:,center_ind_pe-2:center_ind_pe+2,:] = center
 
         return kspace_full
     
