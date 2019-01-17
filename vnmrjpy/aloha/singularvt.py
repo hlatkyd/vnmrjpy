@@ -1,6 +1,7 @@
 import copy
 import numpy as np
 import vnmrjpy as vj
+import sys
 np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
 """
 Collection of solvers for low rank matrix completion
@@ -10,7 +11,7 @@ class SingularValueThresholding():
     """
     Matrix completion by singular value soft thresholding
     """
-    def __init__(self,A,tau=None, delta=None, epsilon=1e-4, max_iter=10,\
+    def __init__(self,A,tau=None, delta=None, epsilon=1e-4, max_iter=1000,\
                 realtimeplot=True):
 
         self.A = A

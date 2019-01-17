@@ -41,6 +41,7 @@
 			- lmafit.py
 			- admm.py
 			- pyramidal.py
+			- svt.py
 			- lowranksolvers.py
 		- fit {T1,T2,Dixon,etc}
 		{FILES}

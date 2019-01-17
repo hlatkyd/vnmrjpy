@@ -11,14 +11,6 @@ Functions for handling Hankel matrices in various ALOHA implementations
 
 DTYPE = 'complex64'
 
-def average_multilevel_hankel(hankel,rp):
-
-    def _average_single_level():
-
-        pass
-
-    pass
-
 def init_kspace_stage(kspace_fiber,stage,rp):
     """Setup kspace for current pyramidal stage
 
@@ -54,7 +46,7 @@ def init_kspace_stage(kspace_fiber,stage,rp):
 
     return kspace_init
 
-def finish_kspace_stage(kspace_stage, kspace_full, stage_iter,rp):
+def finish_kspace_stage(kspace_stage, kspace_full, rp):
     """Complete pyramidal stage, put inferred data back into original position
 
     TODO : maybe put known center data back here
@@ -64,8 +56,6 @@ def finish_kspace_stage(kspace_stage, kspace_full, stage_iter,rp):
     Args:
         kspace_stage
         kspace_full
-        stage_iter (0 or 1) -- indicator: kx-ky needs 2 runs for one stage
-        rp (dict) -- recon parameters
     Return:
         kspace_full
     """
@@ -85,18 +75,8 @@ def finish_kspace_stage(kspace_stage, kspace_full, stage_iter,rp):
         # saving original center
         center = copy.deepcopy(kspace_full[:,center_ind_pe-2:center_ind_pe+2,\
                                 center_ind_pe2-2:center_ind_pe2+2])
-        if stage_iter == 0:  # kx weighting
-            # saving original zero freq line
-            zerofreq = copy.deepcopy(kspace_full[:,center_ind_pe-1:\
-                                                    center_ind_pe,:])
-            # putting back into the original
-            kspace_full[:,ind_start:ind_end,ind2_start:ind2_end] = kspace_stage
-            kspace_full[:,center_ind_pe-1:center_ind_pe,:] = zerofreq
-        elif stage_iter == 1:  # ky weighting
-            zerofreq = copy.deepcopy(kspace_full[:,:,center_ind_pe2-1:\
-                                                        center_ind_pe2])
-            kspace_full[:,ind_start:ind_end,ind2_start:ind2_end] = kspace_stage
-            kspace_full[:,:,center_ind_pe2-1:center_ind_pe2] = zerofreq
+
+        kspace_full[:,ind_start:ind_end,ind2_start:ind2_end] = kspace_stage
 
         # putting back known center
 
@@ -369,15 +349,16 @@ def deconstruct_hankel(hankel,stage,rp):
         nd_data (np.ndarray)
 
     """
-    def _calc_fiber_shape(stage,rp_recontype,rp_fiber_shape):
+    def _calc_fiber_shape(stage,rp):
         """Return fiber shape at current stage as tuple"""
 
-        if rp_recontype in ['kx-ky','kx-ky_angio']:
-            (rcvrs,x,y) = rp_fiber_shape
+        if rp['recontype'] in ['kx-ky','kx-ky_angio']:
+            (rcvrs,x,y) = rp['fiber_shape']
             return (rcvrs,x//2**stage,y//2**stage)
-        elif rp_recontype == 'k-t':
-            (rcvrs,x,t) = rp_fiber_shape
+        elif rp['recontype'] == 'k-t':
+            (rcvrs,x,t) = rp['fiber_shape']
             return (rcvrs,x//2**stage,t)
+
     def _block_vector_from_col(col, height):
         """Make vector of blocks from a higher level Hankel column"""
 
@@ -389,6 +370,7 @@ def deconstruct_hankel(hankel,stage,rp):
             vec[num,:,:] = col[num*block_x:(1+num)*block_x,:]
         return vec
 
+    #@numba.jit(nopython = True) 
     def _deconstruct_hankel_level(hankel,m,p,factors):
         """ Make an array of Hankel building block
 
@@ -415,12 +397,11 @@ def deconstruct_hankel(hankel,stage,rp):
 
     def _average_block_vector(vec,factors):
         """Return list of lover level hankels"""
-
         if len(factors.shape) != len(vec.shape):
             factors = factors[:,np.newaxis,np.newaxis]
         hankels = np.divide(vec,factors)
         return hankels
-
+    
     def _make_factors(n,q):
         """Make array of Hankel block multiplicities for averaging
 
@@ -430,7 +411,7 @@ def deconstruct_hankel(hankel,stage,rp):
         Return:
             factors -- np.array of lenth n
         """
-        factors = np.zeros(n) # multiplicity of 1 block
+        factors = np.zeros(n,dtype='int') # multiplicity of 1 block
         ramp = [i for i in range(1,q)]
         factors[0:len(ramp)] = ramp
         factors[n-len(ramp):] = ramp[::-1]
@@ -446,7 +427,7 @@ def deconstruct_hankel(hankel,stage,rp):
     elif level == 2:
         
         # subinit level
-        (rcvrs,m,n) = _calc_fiber_shape(stage,rp['recontype'],rp['fiber_shape'])
+        (rcvrs,m,n) = _calc_fiber_shape(stage,rp)
         (p,q) = rp['filter_size']  # annihilating filter
         #number of hankel hankel block columns
         cols_rcvr_lvl2 = hankel.shape[1]//(rcvrs*p) 

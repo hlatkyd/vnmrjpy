@@ -1,9 +1,9 @@
 import numpy as np
 import vnmrjpy as vj
-from numba import jit
 import sys
 import copy
 import matplotlib.pyplot as plt
+import time
 
 def pyramidal_kxky(kspace_fiber,weights,rp):
     """ Pyramidal decomposition composit function for kx-ky sparsity case.
@@ -33,6 +33,7 @@ def pyramidal_kxky(kspace_fiber,weights,rp):
 
         for i in range(2):
 
+            #start = time.time()
             weight = weights[2*s+i]
             # init known data for the solvers
             fiber_known = vj.aloha.init_kspace_stage(kspace_fiber,s,rp)
@@ -43,6 +44,8 @@ def pyramidal_kxky(kspace_fiber,weights,rp):
             kspace_stage = vj.aloha.apply_kspace_weights(kspace_stage,weight)
             hankel = vj.aloha.construct_hankel(kspace_stage,rp)
             #plt.imshow(np.absolute(hankel))
+            #inittime = time.time()
+            #print('elapsed time for init : {}'.format(inittime-start))
            
             if rp['solver'] == 'svt':
                 raise(Exception('not implemented'))
@@ -53,14 +56,17 @@ def pyramidal_kxky(kspace_fiber,weights,rp):
                                         realtimeplot=False,\
                                         tol=lmafit_tolerance[s])
                 X,Y,obj = lmafit.solve(max_iter=100)
+                #lmafittime = time.time()
+                #print('elapsed time for lmafit : {}'.format(lmafittime-inittime))
                 admm = vj.aloha.Admm(X,Y.conj().T,fiber_known, s,rp,\
                                         realtimeplot=False)
-                hankel = admm.solve()
-
+                hankel = admm.solve(max_iter=2)
+                #admmtime = time.time()
+                #print('elapsed time for solvers : {}'.format(admmtime-lmafittime))
             fiber = vj.aloha.deconstruct_hankel(hankel,s,rp)
             fiber = vj.aloha.remove_kspace_weights(fiber,weight)
             kspace_fiber_complete = vj.aloha.finish_kspace_stage(\
-                                        fiber,kspace_fiber_complete,rp)
+                                        fiber,kspace_fiber_complete,i,rp)
         
     return kspace_fiber_complete
             
@@ -114,7 +120,7 @@ def pyramidal_kt(kspace_fiber,weights,rp):
         fiber = vj.aloha.deconstruct_hankel(hankel,s,rp)
         fiber = vj.aloha.remove_kspace_weights(fiber,weight)
         kspace_fiber_complete = vj.aloha.finish_kspace_stage(\
-                                    fiber,kspace_fiber_complete,rp)
+                                    fiber,kspace_fiber_complete,0,rp)
         
     return kspace_fiber_complete
             

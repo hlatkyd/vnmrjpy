@@ -2,6 +2,7 @@ import unittest
 import vnmrjpy as vj
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 RP={'rcvrs':4,'filter_size':(11,7),'virtualcoilboost':False}
 PLOTTING = False
@@ -12,9 +13,11 @@ class Test_hankelutils(unittest.TestCase):
 
         rp={'rcvrs':4,'filter_size':(11,7),'virtualcoilboost':False}
         indata = np.random.rand(4,128,21)
+        start = time.time()
         hankel = vj.aloha.construct_hankel(indata,rp)
-        
+        end = time.time()
         self.assertEqual(hankel.shape,(1770,308))
+        print('Construct hankel time : {}'.format(end-start))
 
     def test_deconstruct_hankel(self):
         
@@ -64,7 +67,8 @@ class Test_hankelutils(unittest.TestCase):
         stagek = np.ones((4,64,64))
         kspace_full = vj.aloha.finish_kspace_stage(stagek,fullk,rp)
         self.assertEqual(kspace_full.shape,(4,128,128))
-        self.assertEqual(kspace_full[1,64,64],1)
+        self.assertEqual(kspace_full[1,64,64],0)
+        self.assertEqual(kspace_full[1,60,60],1)
 
         rp={'rcvrs':4,'filter_size':(11,7),'virtualcoilboost':False,\
             'recontype':'k-t','fiber_shape':(4,128,21),'stages':3}
@@ -72,5 +76,5 @@ class Test_hankelutils(unittest.TestCase):
         stagek = np.ones((4,64,21))
         kspace_full = vj.aloha.finish_kspace_stage(stagek,fullk,rp)
         self.assertEqual(kspace_full.shape,(4,128,21))
-        self.assertEqual(kspace_full[1,64,10],1)
+        self.assertEqual(kspace_full[1,60,10],1)
 

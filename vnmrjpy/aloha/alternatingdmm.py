@@ -2,6 +2,7 @@ import copy
 import numpy as np
 import sys
 import vnmrjpy as vj
+import time
 
 class Admm():
     """Alternating Direction Method of Multipliers solver for Aloha
@@ -72,13 +73,15 @@ class Admm():
 
 
         for _ in range(max_iter):
-
+        
+            #start = time.time()
             # taking the averages from tha hankel structure and rebuild
             hankel_inferred_part = np.multiply(\
                                 U.dot(V.conj().T)-lagr,self.hankel_mask_inv)  
+            #dtime = time.time()
             fiber_inferred_part = vj.aloha.deconstruct_hankel(\
                                 hankel_inferred_part,s,rp)
-
+            #print('deconstruct time {}'.format(time.time()-dtime))
             fiber = fiber_orig_part + fiber_inferred_part
             hankel = vj.aloha.construct_hankel(fiber,rp)
             # updating U,V and the lagrangian
@@ -91,6 +94,7 @@ class Admm():
 
             if self.realtimeplot == True:
                 self.rtplot.update_data(np.absolute(U.dot(V.conj().T)))
+            #print('admm iter time {}'.format(time.time()-start))
 
         return U.dot(V.conj().T)
     

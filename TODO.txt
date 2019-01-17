@@ -1,10 +1,15 @@
 1. CHECK : Mask generation; wrong oputput axes maybe
 2. ONGOING: kx ky wavelet in aloha
-4. DO: put center kspace back at finish stage
 5. DO: make aloha tests separate for each sequence
-6. DO: rewrite aloha testing, cstestio
+7. DOING : skipint decoder
+8. DO: decompose_hankel is slow, try numba
+9. DO: admm is slow, try numba
+10. DO: correct admm test
+11. DO: rewrite decompose hankel to return a projection
 
 DONE:
 construct_hankel
 deconstruct_hankel
 redo hankelutils
+put center kspace back at finish stage
+rewrite aloha testing, cstestio

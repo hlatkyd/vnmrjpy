@@ -3,6 +3,55 @@ import nibabel as nib
 from scipy.signal import gaussian
 import vnmrjpy as vj
 
+class SkipintDecoder():
+    """Handles decoding of varios skipint formats
+
+    skipint is the parameter responsible for choosing which k-space lines are
+    acquired during compressed sensing acquisition
+
+    """
+
+    def __init__(self,procpar_dict):
+        """Gather parameters from procpar for decoding
+        
+        Args:
+            procpar_dict (dict) -- procpar dictionary, created by ProcparReader 
+        """
+        #check skiptab
+        if 'skiptab' in procpar_dict.keys() and \
+            procpar_dict['skiptab'] == 'y':
+            pass
+        else:
+            raise(Exception("skiptab doesn't exist or set to 'n'."))
+        self.skipint = procpar_dict['skipint']
+        self.p = procpar_dict
+        
+
+    def make_skiptensor(self):
+        """Main routine, makes a mask of the acquired lines
+
+        Return:
+            skiptensor (np.ndarray) -- multidimensional array, corresponding
+                                    to a fiber in kspace. values are 1 if
+                                    the kspace line is acquired, 0 if not. 
+
+        """
+        p = self.p
+        if p['pslabel'] == 'ge3d_elliptical':
+            bits = 32  # original encoding, see spinsights
+            slice_shape = (int(p['nv']),int(p['nv2']))
+            skiptensor = np.zeros(slice_shape)
+            skipint = [int(x) for x in self.skipint]
+            skipint_bin_vals = [str(np.binary_repr(d,bits)) for d in skipint]
+            skipint_bin_vals = ''.join(skipint_bin_vals)
+            skipint_bin_array = np.array([int(i) for i in skipint_bin_vals])
+            skiptensor = np.reshape(skipint_bin_array, slice_shape,order='f')
+            return skiptensor
+            
+
+        else:
+            raise(Exception('only ge3d_elliptical implemented.'))
+
 class SkipintGenerator():
     """Class to handle skipint parameter generation for compressed sensing
 

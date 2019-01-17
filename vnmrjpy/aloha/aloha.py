@@ -37,6 +37,10 @@ class Aloha():
 
         TODO : kspace_orig is for test purposes only
         """
+        def _default_filter_size(dims):
+
+            pass        
+
         def _get_recontype():
             """get 'recontype', which defines Hankel matrix construction
 

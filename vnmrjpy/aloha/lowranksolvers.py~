@@ -63,7 +63,7 @@ def svt(A,known_data=None,tau=None, delta=None, epsilon=1e-4,max_iter=1000,\
 
     return X
 
-
+@numba.jit
 def lmafit(init_data,known_data=None,\
             tol=5e-4,\
             k=1,\
@@ -218,76 +218,6 @@ def lmafit(init_data,known_data=None,\
 
     return X, Y, [obj, RR, iter_, relres, reschg] 
 
-def admm(U,V,fiber_stage_known,stage,rp,\
-                                    mu=1000,\
-                                    realtimeplot=False,\
-                                    noiseless=True,\
-                                    device='CPU'):
-    """Alternating Direction Method of Multipliers solver for Aloha
-
-
-    Tuned for ALOHA MRI reconstruction framework, not for general use yet.
-    Lmafit estimates the rank, then Admm is used to enforce the hankel structure
-
-    refs.: Aloha papers ?
-            Admm paper ?
-        
-    Args:
-        U, V  (np.matrix) -- U*V.H is the estimated hankel matrix from Lmafit
-        fiber_stage_known (np.ndarray) -- known elements in fiber,zerofilled
-        stage (int) -- pyramidal decomposition stage ?? WHY??
-        rp {dictionary} -- Aloha recon parameters 
-        realitmeplot (boolean) -- option to plot each iteration
-        noiseless (boolean) -- ?
-    Returns:
-        hankel
-    """
-    fiber_shape = rp['fiber_shape']
-    hankel_mask = np.absolute(vj.aloha.construct_hankel(fiber_stage_known,rp))
-    hankel_mask[hankel_mask != 0] = 1
-    hankel_mask = np.array(hankel_mask,dtype='complex64')
-    hankel_mask_inv = np.ones(hankel_mask.shape) - hankel_mask
-
-    hankel0 = U.dot(V.conj().T)
-    hankel = U.dot(V.conj().T)
-
-    fiber_orig_part = copy.deepcopy(fiber_stage)
-    # init lagrangian update
-    lagr = np.zeros(hankel.shape,dtype='complex64')
-    #lagr = copy.deepcopy(hankel)
-    us = (U.conj().T.dot(U)).shape
-    vs = (V.conj().T.dot(V)).shape
-    Iu = np.eye(us[0],us[1],dtype='complex64')
-    Iv = np.eye(vs[0],vs[0],dtype='complex64')
-
-    # real time plotting for debugging purposes
-    realtimeplot = realtimeplot
-    if realtimeplot == True:
-        rtplot = vj.util.RealTimeImshow(np.absolute(hankel0))
-
-    for _ in range(max_iter):
+def admm():
     
-        #start = time.time()
-        # taking the averages from tha hankel structure and rebuild
-        hankel_inferred_part = np.multiply(hankel-lagr,self.hankel_mask_inv)
-        #dtime = time.time()
-        fiber_inferred_part = vj.aloha.deconstruct_hankel(\
-                            hankel_inferred_part,s,rp)
-        #print('deconstruct time {}'.format(time.time()-dtime))
-        fiber = fiber_orig_part + fiber_inferred_part
-        hankel0 = vj.aloha.construct_hankel(fiber,rp)
-        # updating U,V and the lagrangian
-        #U_calc_inv = np.linalg.inv(Iv+mu*V.conj().T.dot(V))
-        U = mu*(hankel0+lagr).dot(V).dot(\
-                            np.linalg.inv(Iv+mu*V.conj().T.dot(V)))
-        #V_calc_inv = np.linalg.inv(Iu+mu*U.conj().T.dot(U))
-        V = mu*((hankel0+lagr).conj().T).dot(U).dot(\
-                            np.linalg.inv(Iu+mu*U.conj().T.dot(U)))
-        hankel = U.dot(V.conj().T)
-        lagr = hankel0 - hankel + lagr
-
-        if realtimeplot == True:
-            rtplot.update_data(np.absolute(hankel))
-        #print('admm iter time {}'.format(time.time()-start))
-
-    return hankel   
+    pass
