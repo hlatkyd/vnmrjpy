@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 import copy
 import vnmrjpy as vj
 import numba
-
+import cupy as cp
+from scipy.ndimage.filters import convolve
 """
 Functions for handling Hankel matrices in various ALOHA implementations
 
@@ -11,13 +12,156 @@ Functions for handling Hankel matrices in various ALOHA implementations
 
 DTYPE = 'complex64'
 
-def average_multilevel_hankel(hankel,rp):
+def average_hankel(hankel,stage,rp,level=None):
+    """Averages elements in matrix according to the enforced hankel shape
 
-    def _average_single_level():
+    Args:
+        hankel
+        stage
+        rp
+    Returns:
+        hankel_avg
+    """
+    def _get_level(rp):
+        """get level count of multilevel hankel"""
+        if rp['recontype'] in ['kx-ky','kx-ky_angio','k-t']:
+            return 2
 
-        pass
+    def _calc_fiber_shape(stage,rp_recontype,rp_fiber_shape):
+        """Return fiber shape at current stage as tuple"""
 
-    pass
+        if rp_recontype in ['kx-ky','kx-ky_angio']:
+            (rcvrs,x,y) = rp_fiber_shape
+            return (rcvrs,x//2**stage,y//2**stage)
+        elif rp_recontype == 'k-t':
+            (rcvrs,x,t) = rp_fiber_shape
+            return (rcvrs,x//2**stage,t)
+    
+    def _make_kernel(hankel_shape):
+        """makes convolution kernel to sum anti-diagonals"""
+
+        return np.fliplr(np.diag(hankel_shape[1]*2-1))
+
+    def _make_weights(hankel_shape):
+
+        (m,n) = hankel_shape
+        weights = np.array([[min(n,i+j+1) for j in range(n)] for i in range(m)])
+        weights = np.minimum(div,flipud(np.fliplr(weights)))
+        return weights
+
+    def _avg_hankel_block(hankel_block,kernel,weights):
+    
+        hankel_block = convolve(hankel_block,kernel,mode='constant',cval=0)
+        return hankel_block / weights
+
+    if level == None:
+        level = _get_level(rp)
+
+    if level == 1:
+        raise(Exception('not implemented'))
+    elif level == 2:
+
+        (rcvrs,m,n) = _calc_fiber_shape(stage,rp['recontype'],rp['fiber_shape'])
+        (p,q) = rp['filter_size']
+        hankel_block_shape = (m-p+1,p)
+        kernel = _make_kernel(hankel_block_shape)
+        weights = _make_weights(hankel_block_shape)
+        #for allhankelblockswithgenerator????
+
+    elif level == 3:
+        raise('not implemented')
+
+    
+
+def construct_hankel_cuda(nd_data, rp, level=None,order=None):
+    """Contruct Multilevel Hankel matrix. same as other, but uses cupy
+
+    Args:
+        nd_data : (np.ndarray) -- input n dimensional data. dim 0 is assumed
+                                to be the receiver dimension
+        rp (dictionary) -- vnmrjpy aloha reconpar dictionary
+        order (list) -- multileveling order. list elements are the dimensions
+        level (int) -- number of levels (if None it is assumed from rp)
+
+    Returns:
+        hankel (np.ndarray(x,y)) 2D multilevel Hankel matrix
+    """
+    def _construct_hankel_level(block_vector, filt):
+        """Create hanekl from a vector of matrices
+
+        Args:
+            block_vector (np.ndarray) --  vector of matrices
+            filt (int)  -- filter size on dimension according to Hankel level
+        Return:
+            hankel
+        """
+        if len(block_vector.shape) == 1:
+            lvl=1
+            block_vector = cp.expand_dims(block_vector,axis=-1) 
+            block_vector = cp.expand_dims(block_vector,axis=-1) 
+        if len(block_vector.shape) == 3:
+            lvl=2
+        else:
+            raise(Exception('weird shape'))
+        shape_x = (block_vector.shape[0]-filt+1)*block_vector.shape[1]
+        shape_y = block_vector.shape[2]*filt
+        hankel = cp.zeros((shape_x,shape_y),dtype='complex64')
+
+        row_num = block_vector.shape[0]-filt+1
+        col_num = filt
+        row_size = block_vector.shape[1]
+        col_size = block_vector.shape[2]
+        for col in range(col_num):
+
+            for row in range(row_num):
+
+                hankel[row*row_size : (row+1)*row_size,\
+                        col*col_size : (col+1)*col_size] = \
+                                            block_vector[col+row,:,:]
+
+        return hankel
+
+    nd_data = cp.array(nd_data, dtype='complex64')
+
+    # getting level
+    if level == None: 
+        level = len(rp['filter_size'])
+
+    if level == 1:
+
+        raise(Exception('not implemented'))
+
+    if level == 2:    
+        # annihilating filter size
+        p, q = rp['filter_size']
+        # hankel m n
+        m, n = nd_data.shape[1:]
+        #init final shape
+        shape_x = (m-p+1)*(n-q+1)
+        shape_y = p*q*nd_data.shape[0]  # concatenate along receiver dimension
+        shape_x_lvl1 = m-p+1
+        shape_y_lvl1 = p
+        shape_x_rcvr = shape_x
+        shape_y_rcvr = shape_y//nd_data.shape[0]
+        
+        hankel_rcvr = cp.zeros((shape_x_rcvr,shape_y_rcvr),dtype='complex64')
+        hankel_lvl1_vec = cp.zeros((n,shape_x_lvl1,shape_y_lvl1),dtype='complex64')
+        hankel = cp.zeros((shape_x,shape_y),dtype='complex64')
+
+        for rcvr in range(nd_data.shape[0]):
+
+            for j in range(nd_data.shape[2]):
+               
+                vec = nd_data[rcvr,:,j]
+                hankel_lvl1 = _construct_hankel_level(vec,p)
+                hankel_lvl1_vec[j,:,:] = hankel_lvl1
+            hankel_rcvr = _construct_hankel_level(hankel_lvl1_vec,q)
+            hankel[:,rcvr*shape_y_rcvr:(rcvr+1)*shape_y_rcvr] = hankel_rcvr
+
+        return hankel
+
+    if level == 3:
+        raise(Exception('not implemented'))
 
 def init_kspace_stage(kspace_fiber,stage,rp):
     """Setup kspace for current pyramidal stage
@@ -344,8 +488,9 @@ def construct_hankel(nd_data, rp, level=None,order=None):
 
             for j in range(nd_data.shape[2]):
                
-                vec = [nd_data[rcvr,i,j] for i in range(nd_data.shape[1])]
-                vec = np.array(vec)
+                #vec = [nd_data[rcvr,i,j] for i in range(nd_data.shape[1])]
+                #vec = np.array(vec)
+                vec = nd_data[rcvr,:,j]
                 hankel_lvl1 = _construct_hankel_level(vec,p)
                 hankel_lvl1_vec[j,:,:] = hankel_lvl1
             hankel_rcvr = _construct_hankel_level(hankel_lvl1_vec,q)

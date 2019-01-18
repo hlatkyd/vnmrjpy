@@ -6,6 +6,7 @@
 9. DO: admm is slow, try numba
 10. DO: correct admm test
 11. DO: rewrite decompose hankel to return a projection
+12. DO: consider rp as namedtuple
 
 DONE:
 construct_hankel
