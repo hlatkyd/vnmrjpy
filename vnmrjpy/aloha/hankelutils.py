@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import copy
 import vnmrjpy as vj
 import numba
-import cupy as cp
+#import cupy as cp
 from scipy.ndimage.filters import convolve
 """
 Functions for handling Hankel matrices in various ALOHA implementations

@@ -3,12 +3,21 @@ import vnmrjpy as vj
 import numpy as np
 import matplotlib.pyplot as plt
 import time
-import cupy as cp
+#import cupy as cp
 
 RP={'rcvrs':4,'filter_size':(11,7),'virtualcoilboost':False}
 PLOTTING = False
 
 class Test_hankelutils(unittest.TestCase):
+
+    def test_average_hankel(self):
+
+        rp={'rcvrs':4,'filter_size':(11,7),'virtualcoilboost':False,\
+            'recontype':'k-t','fiber_shape':(4,128,21),'stages':3}
+        stage = 0
+        hankel = np.random.rand(50,20)
+        hankel_avg = vj.aloha.average_hankel(hankel,stage,rp)
+
     #-------------------------PERFORMANCE--------------------------------------
     # raw nobrain-cupy switch is slooooooooooooooooooooowwwwwwwwwwwwwwwwwwwwww
     """
