@@ -15,9 +15,19 @@ class Test_hankelutils(unittest.TestCase):
         rp={'rcvrs':4,'filter_size':(11,7),'virtualcoilboost':False,\
             'recontype':'k-t','fiber_shape':(4,128,21),'stages':3}
         stage = 0
-        hankel = np.random.rand(50,20)
+        hankel = np.random.rand(1770,308)
+        start = time.time()
         hankel_avg = vj.aloha.average_hankel(hankel,stage,rp)
+        print('hankel avg small : {}'.format(time.time()-start))
 
+        rp={'rcvrs':4,'filter_size':(21,21),'virtualcoilboost':False,
+            'recontype':'kx-ky','fiber_shape':(4,192,192),'stages':3}
+        hankel = np.random.rand(29584,1764)
+        start = time.time()
+        hankel = vj.aloha.average_hankel(hankel,stage,rp)
+        end = time.time()
+        self.assertEqual(hankel.shape,(29584,1764))
+        print('average big hankel time : {}'.format(end-start))
     #-------------------------PERFORMANCE--------------------------------------
     # raw nobrain-cupy switch is slooooooooooooooooooooowwwwwwwwwwwwwwwwwwwwww
     """
@@ -40,6 +50,24 @@ class Test_hankelutils(unittest.TestCase):
         print('Construct big hankel (CUDA) time : {}'.format(end-start))
     """
     #--------------------------STANDARD TESTS----------------------------------
+    def test_construct_hankel_2d(self):
+        # this is the old one for time comparison
+        rp={'rcvrs':4,'filter_size':(11,7),'virtualcoilboost':False}
+        indata = np.random.rand(4,128,21)
+        start = time.time()
+        hankel = vj.aloha.construct_hankel_2d(indata,rp)
+        end = time.time()
+        self.assertEqual(hankel.shape,(1770,308))
+        print('Construct_2d small hankel time : {}'.format(end-start))
+        # test bigger kx ky
+        rp={'rcvrs':4,'filter_size':(21,21),'virtualcoilboost':False}
+        indata = np.random.rand(4,192,192)
+        start = time.time()
+        hankel = vj.aloha.construct_hankel_2d(indata,rp)
+        end = time.time()
+        self.assertEqual(hankel.shape,(29584,1764))
+        print('Construct_2d big hankel time : {}'.format(end-start))
+
     def test_construct_hankel(self):
 
         rp={'rcvrs':4,'filter_size':(11,7),'virtualcoilboost':False}

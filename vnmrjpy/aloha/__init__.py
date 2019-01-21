@@ -10,3 +10,4 @@ from .lmafit import *
 from .pyramidal import *
 from .singularvt import *
 from .alternatingdmm import *
+from .mathutils import *

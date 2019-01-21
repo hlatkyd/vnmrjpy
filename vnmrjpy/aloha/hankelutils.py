@@ -9,8 +9,56 @@ from scipy.ndimage.filters import convolve
 Functions for handling Hankel matrices in various ALOHA implementations
 
 """
-
 DTYPE = 'complex64'
+def construct_hankel_2d(slice3d,rp):
+    """Make Hankel matrix from 2d+rcvrs data
+
+    This is the old implementation
+    INPUT: slice2d_all_rcvrs : numpy.array[receivers, slice]
+    OUTPUT: hankel : numpy.array (m-p)*(n-q) x p*q*rcvrs
+    """
+    slice3d = np.array(slice3d, dtype='complex64')
+    # annihilating filter size
+    (p,q) = rp['filter_size']
+    # hankel m n
+    (m,n) = slice3d.shape[1:3]
+
+    for rcvr in range(slice3d.shape[0]):
+
+        slice2d = slice3d[rcvr,...]
+
+        #make inner hankel list
+        for j in range(0,n):
+            # iterate in outer hankel elements
+            for k in range(0,p):
+                # iterate inner hankel columns
+                col = np.expand_dims(slice2d[k:m-p+k+1,j],axis=1)
+                if k == 0:
+                    cols = col
+                else:
+                    cols = np.concatenate([cols,col],axis=1)
+            if j == 0:
+                hankel = np.expand_dims(cols,axis=0)
+            else:
+                hankel = np.concatenate(\
+                    [hankel, np.expand_dims(cols,axis=0)], axis=0)
+
+        # make outer hankel
+        for i in range(q):
+            #col = cp.hstack([hankel[i:n-q+i,:,:]])
+            col = np.vstack([hankel[k,:,:] for k in range(i,n-q+i+1)])
+            if i == 0:
+                cols = col
+            else:
+                cols = np.concatenate([cols,col], axis=1)
+        # concatenating along the receivers
+        if rcvr == 0:
+            hankel_full = cols
+        else:
+            hankel_full = np.concatenate([hankel_full, cols], axis=1)
+
+    return hankel_full
+
 
 def average_hankel(hankel,stage,rp,level=None):
     """Averages elements in matrix according to the enforced hankel shape
@@ -40,13 +88,13 @@ def average_hankel(hankel,stage,rp,level=None):
     def _make_kernel(hankel_shape):
         """makes convolution kernel to sum anti-diagonals"""
 
-        return np.fliplr(np.diag(hankel_shape[1]*2-1))
+        return np.fliplr(np.eye(hankel_shape[1]*2-1))
 
     def _make_weights(hankel_shape):
 
         (m,n) = hankel_shape
         weights = np.array([[min(n,i+j+1) for j in range(n)] for i in range(m)])
-        weights = np.minimum(div,flipud(np.fliplr(weights)))
+        weights = np.minimum(weights,np.flipud(np.fliplr(weights)))
         return weights
 
     def _avg_hankel_block(hankel_block,kernel,weights):
@@ -64,10 +112,24 @@ def average_hankel(hankel,stage,rp,level=None):
         (rcvrs,m,n) = _calc_fiber_shape(stage,rp['recontype'],rp['fiber_shape'])
         (p,q) = rp['filter_size']
         hankel_block_shape = (m-p+1,p)
+        # make filter for inner block anti-diagonal averaging
         kernel = _make_kernel(hankel_block_shape)
         weights = _make_weights(hankel_block_shape)
         #for allhankelblockswithgenerator????
+        # reshape hankel to 4d
+        shape4d = (hankel.shape[0]//hankel_block_shape[0],hankel_block_shape[0],\
+                    hankel.shape[1]//hankel_block_shape[1],hankel_block_shape[1])
+        hankel4d = np.reshape(hankel,shape4d)
+        for i in range(hankel4d.shape[0]):
+            for j in range(hankel4d.shape[2]):
 
+                hankel4d[i,:,j,:] = _avg_hankel_block(hankel4d[i,:,j,:],\
+                                                    kernel, weights)
+
+        hankel = np.reshape(hankel4d,hankel.shape)
+        return hankel
+                
+                
     elif level == 3:
         raise('not implemented')
 
