@@ -585,6 +585,7 @@ def deconstruct_hankel(hankel,stage,rp):
         elif rp_recontype == 'k-t':
             (rcvrs,x,t) = rp_fiber_shape
             return (rcvrs,x//2**stage,t)
+    
     def _block_vector_from_col(col, height):
         """Make vector of blocks from a higher level Hankel column"""
 
@@ -628,6 +629,7 @@ def deconstruct_hankel(hankel,stage,rp):
         hankels = np.divide(vec,factors)
         return hankels
 
+    @numba.jit(nopython=True)
     def _make_factors(n,q):
         """Make array of Hankel block multiplicities for averaging
 

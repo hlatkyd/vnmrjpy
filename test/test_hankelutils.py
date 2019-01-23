@@ -9,7 +9,7 @@ RP={'rcvrs':4,'filter_size':(11,7),'virtualcoilboost':False}
 PLOTTING = False
 
 class Test_hankelutils(unittest.TestCase):
-
+    """
     def test_average_hankel(self):
 
         rp={'rcvrs':4,'filter_size':(11,7),'virtualcoilboost':False,\
@@ -28,6 +28,7 @@ class Test_hankelutils(unittest.TestCase):
         end = time.time()
         self.assertEqual(hankel.shape,(29584,1764))
         print('average big hankel time : {}'.format(end-start))
+    """
     #-------------------------PERFORMANCE--------------------------------------
     # raw nobrain-cupy switch is slooooooooooooooooooooowwwwwwwwwwwwwwwwwwwwww
     """
