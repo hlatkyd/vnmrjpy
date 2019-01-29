@@ -9,6 +9,58 @@ RP={'rcvrs':4,'filter_size':(11,7),'virtualcoilboost':False}
 PLOTTING = False
 
 class Test_hankelutils(unittest.TestCase):
+    
+    def test_lvl2_hankel_average(self):
+
+        #rp={'rcvrs':4,'filter_size':(11,7),'virtualcoilboost':False,\
+        #    'recontype':'k-t','fiber_shape':(4,128,21)}
+        rp={'rcvrs':4,'filter_size':(21,21),'virtualcoilboost':False,\
+            'recontype':'kx-ky','fiber_shape':(4,192,192)}
+        stage = 0
+        (p,q) = rp['filter_size']
+        (rcvrs,m,n) = rp['fiber_shape']
+        fiber = np.random.rand(*rp['fiber_shape'])
+        
+        hankel = vj.aloha.construct_hankel(fiber,rp)
+        noise = np.random.rand(*hankel.shape)
+        hankel_noisy = hankel+noise
+        # average merthod old:
+        start_old = time.time()
+        fiber_avg = vj.aloha.deconstruct_hankel(hankel_noisy,stage,rp)
+        hankel_avg1 = vj.aloha.construct_hankel(fiber_avg,rp)
+        end_old = time.time()
+        # new average method
+        start_new = time.time()
+        hankel_avg2 = vj.aloha.lvl2_hankel_average(hankel_noisy\
+                                        ,rp['filter_size'],fiber.shape)
+        end_new = time.time()
+        print('old avg time: {}'.format(end_old-start_old))
+        print('new avg time: {}'.format(end_new-start_new))
+        plt.subplot(1,4,1)
+        plt.imshow(np.real(hankel))
+        plt.title('orig')
+        plt.subplot(1,4,2)
+        plt.imshow(np.real(hankel_avg1))
+        plt.title('old avg')
+        plt.subplot(1,4,3)
+        plt.imshow(np.real(hankel_avg2))
+        plt.title('new avg')
+        plt.subplot(1,4,4)
+        plt.imshow(np.real(hankel_avg2-hankel_avg1))
+        plt.title('difference')
+        plt.show()
+
+    # this wont be implemented probably
+    """
+    def test_lvl2_hankel_weights(self):
+
+        rp={'rcvrs':4,'filter_size':(11,7),'virtualcoilboost':False,\
+            'recontype':'k-t','fiber_shape':(4,32,21)}
+        filter_shape = (11,7)
+        fiber_shape = (4,32,21)
+        a = vj.aloha.lvl2_hankel_weights(filter_shape,fiber_shape)
+    """
+    # this works, but is really slow
     """
     def test_average_hankel(self):
 
@@ -28,27 +80,6 @@ class Test_hankelutils(unittest.TestCase):
         end = time.time()
         self.assertEqual(hankel.shape,(29584,1764))
         print('average big hankel time : {}'.format(end-start))
-    """
-    #-------------------------PERFORMANCE--------------------------------------
-    # raw nobrain-cupy switch is slooooooooooooooooooooowwwwwwwwwwwwwwwwwwwwww
-    """
-    def test_construct_hankel_cuda(self):
-
-        rp={'rcvrs':4,'filter_size':(11,7),'virtualcoilboost':False}
-        indata = cp.random.rand(4,128,21)
-        start = time.time()
-        hankel = vj.aloha.construct_hankel_cuda(indata,rp)
-        end = time.time()
-        self.assertEqual(hankel.shape,(1770,308))
-        print('Construct small hankel (CUDA) time : {}'.format(end-start))
-        # test bigger kx ky
-        rp={'rcvrs':4,'filter_size':(21,21),'virtualcoilboost':False}
-        indata = cp.random.rand(4,192,192)
-        start = time.time()
-        hankel = vj.aloha.construct_hankel_cuda(indata,rp)
-        end = time.time()
-        self.assertEqual(hankel.shape,(29584,1764))
-        print('Construct big hankel (CUDA) time : {}'.format(end-start))
     """
     #--------------------------STANDARD TESTS----------------------------------
     def test_construct_hankel_2d(self):

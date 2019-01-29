@@ -243,6 +243,12 @@ def admm(U,V,fiber_stage_known,stage,rp,\
         hankel
     """
     fiber_shape = rp['fiber_shape']
+    if len(fiber_shape) == 2:
+        (rcvrs,m,n) = fiber_shape
+        (p,q) = rp['filter_size']
+        hankel_block_shape = (m-p+1,p)
+    else:
+        raise(Exception('not implemented yet'))
     hankel_mask = np.absolute(vj.aloha.construct_hankel(fiber_stage_known,rp))
     hankel_mask[hankel_mask != 0] = 1
     hankel_mask = np.array(hankel_mask,dtype='complex64')
@@ -252,6 +258,8 @@ def admm(U,V,fiber_stage_known,stage,rp,\
     hankel = U.dot(V.conj().T)
 
     fiber_orig_part = copy.deepcopy(fiber_stage)
+    # TODO do thios one better
+    hankel_orig_part = vj.aloha.construct_hankel(fiber_orig_part,rp)
     # init lagrangian update
     lagr = np.zeros(hankel.shape,dtype='complex64')
     #lagr = copy.deepcopy(hankel)
@@ -268,7 +276,12 @@ def admm(U,V,fiber_stage_known,stage,rp,\
     for _ in range(max_iter):
     
         #start = time.time()
-        # taking the averages from tha hankel structure and rebuild
+        # average the hankel structure, and put back original elements
+        hankel = vj.aloha.avg_lvl2_hankel(hankel,hankel_block_shape,rcvrs)
+        hankel = np.multiply(hankel,hankel_mask_inv) + hankel_orig_part
+        """
+        this is the old method
+
         hankel_inferred_part = np.multiply(hankel-lagr,self.hankel_mask_inv)
         #dtime = time.time()
         fiber_inferred_part = vj.aloha.deconstruct_hankel(\
@@ -276,6 +289,7 @@ def admm(U,V,fiber_stage_known,stage,rp,\
         #print('deconstruct time {}'.format(time.time()-dtime))
         fiber = fiber_orig_part + fiber_inferred_part
         hankel0 = vj.aloha.construct_hankel(fiber,rp)
+        """
         # updating U,V and the lagrangian
         #U_calc_inv = np.linalg.inv(Iv+mu*V.conj().T.dot(V))
         U = mu*(hankel0+lagr).dot(V).dot(\

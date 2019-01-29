@@ -60,7 +60,7 @@ def pyramidal_kxky(kspace_fiber,weights,rp):
                 #print('elapsed time for lmafit : {}'.format(lmafittime-inittime))
                 admm = vj.aloha.Admm(X,Y.conj().T,fiber_known, s,rp,\
                                         realtimeplot=False)
-                hankel = admm.solve(max_iter=2)
+                hankel = admm.solve(max_iter=500)
                 #admmtime = time.time()
                 #print('elapsed time for solvers : {}'.format(admmtime-lmafittime))
             fiber = vj.aloha.deconstruct_hankel(hankel,s,rp)

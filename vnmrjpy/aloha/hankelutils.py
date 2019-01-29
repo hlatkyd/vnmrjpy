@@ -5,11 +5,13 @@ import vnmrjpy as vj
 import numba
 #import cupy as cp
 from scipy.ndimage.filters import convolve
+from scipy.signal import fftconvolve
 """
 Functions for handling Hankel matrices in various ALOHA implementations
 
 """
 DTYPE = 'complex64'
+# this is to be deprecated, but works fine
 def construct_hankel_2d(slice3d,rp):
     """Make Hankel matrix from 2d+rcvrs data
 
@@ -59,7 +61,101 @@ def construct_hankel_2d(slice3d,rp):
 
     return hankel_full
 
+def lvl2_hankel_average(hankel_full,filter_shape, fiber_shape):
 
+    (rcvrs,m,n) = fiber_shape
+    (p,q) = filter_shape
+    inner_shape = (m-p+1,p)
+    outer_shape = (n-q+1,q)
+
+    # make convolution kernel
+    kernel = np.fliplr(np.eye(outer_shape[0],dtype='complex64'))
+    # shape of 1 hnakel without receiver concat
+    oldshape = (hankel_full.shape[0],hankel_full.shape[1]//rcvrs)
+    newshape = (inner_shape[0],outer_shape[0],inner_shape[1],outer_shape[1])
+    for rcvr in range(rcvrs):
+
+        hankel = hankel_full[:,p*q*rcvr:p*q*(rcvr+1)]
+        print('hankel shape rcvr {}'.format(hankel.shape))
+        hankel = np.reshape(hankel,newshape,order='f')
+        hankel = np.swapaxes(hankel,1,2)
+        # now axis 0,1 represents the inner blocks, 2,3 is the outer
+        for ind in range(n):  # n is also the number of antidiagonals
+
+            # find each i, j pair for ind
+            pairs = [[ind-j,j] for j in range(ind+1) if (j < q and ind-j < n-q+1)]
+
+            list_to_avg = [hankel[...,pair[0],pair[1]] for pair in pairs]
+            avg = np.zeros_like(hankel[...,0,0],dtype='complex64') 
+            for inner_matrix in list_to_avg:
+            
+                avg += fftconvolve(inner_matrix,kernel,mode='same') 
+            # divide by the weights
+            avg = avg / len(pairs)
+
+            for pair in pairs:
+
+                hankel[...,pair[0],pair[1]] = avg
+
+        hankel = np.reshape(np.swapaxes(hankel,1,2),oldshape,order='f')
+        hankel_full[:,p*q*rcvr:p*q*(rcvr+1)] = hankel
+
+    return hankel_full
+
+def lvl2_hankel_masks(filter_shape,fiber_shape):
+
+    pass
+
+def lvl2_hankel_weights(filter_shape,fiber_shape):
+    """Make weights for the full 2 level hankel matrix.
+
+    Each element of result gives the multiplicity of an element in the 2-level
+    hankel structure
+
+    Args:
+        filter_shape (tuple) -- ALOHA annihilating filter shape
+        fiber_shape (tuple) -- 3D filter shape (receiver,dim1,dim2)
+    Return:
+        full_weights
+    """
+    (rcvrs,m,n) = fiber_shape
+    (p,q) = filter_shape
+    (x1,y1) = (m-p+1,p)  # inner hankel shape
+    (x2,y2) = (n-q+1,q)  # outer block shape, if 1 inner hankel is 1 element
+    # base weight of an inner hankel
+    weights1 = np.array([[min(y1,i+j+1) for j in range(y1)] for i in range(x1)])
+    weights1 = np.minimum(weights1,np.flipud(np.fliplr(weights1)))
+    # weights to weight the weights (yeah!)
+    weights2 = np.array([[min(y2,i+j+1) for j in range(y2)] for i in range(x2)])
+    weights2 = np.minimum(weights2,np.flipud(np.fliplr(weights2)))
+    print('weights2 shape {}'.format(weights2.shape))
+    full_weights = np.tile(weights1,(x2,y2,1,1))
+    # now weight the weights with the weights
+    full_weights = full_weights * weights2[...,np.newaxis,np.newaxis]
+    full_weights = np.swapaxes(full_weights,1,2)
+    full_weights = np.reshape(full_weights,(x1*x2,y1*y2))
+    # side-by-side concatenation as per receiverdim
+    #full_weights = np.concatenate([full_weights for i in range(rcvrs)],axis=1)
+    return full_weights
+    
+
+def average_hankel_fftconvolve(hankel,stage,rp,level=None):
+    """Averages elements in matrix according to the enforced hankel shape
+
+    Method: Work on full hankel at once, mask even blocks, average
+    anti-diagonals in rest, then do it again for the odd blocks
+    use scipys fftconvolve
+
+    Args:
+        hankel
+        stage
+        rp
+    Returns:
+        hankel_avg
+    """
+    pass
+
+# this is deprecated and slow
 def average_hankel(hankel,stage,rp,level=None):
     """Averages elements in matrix according to the enforced hankel shape
 
@@ -132,98 +228,6 @@ def average_hankel(hankel,stage,rp,level=None):
                 
     elif level == 3:
         raise('not implemented')
-
-    
-
-def construct_hankel_cuda(nd_data, rp, level=None,order=None):
-    """Contruct Multilevel Hankel matrix. same as other, but uses cupy
-
-    Args:
-        nd_data : (np.ndarray) -- input n dimensional data. dim 0 is assumed
-                                to be the receiver dimension
-        rp (dictionary) -- vnmrjpy aloha reconpar dictionary
-        order (list) -- multileveling order. list elements are the dimensions
-        level (int) -- number of levels (if None it is assumed from rp)
-
-    Returns:
-        hankel (np.ndarray(x,y)) 2D multilevel Hankel matrix
-    """
-    def _construct_hankel_level(block_vector, filt):
-        """Create hanekl from a vector of matrices
-
-        Args:
-            block_vector (np.ndarray) --  vector of matrices
-            filt (int)  -- filter size on dimension according to Hankel level
-        Return:
-            hankel
-        """
-        if len(block_vector.shape) == 1:
-            lvl=1
-            block_vector = cp.expand_dims(block_vector,axis=-1) 
-            block_vector = cp.expand_dims(block_vector,axis=-1) 
-        if len(block_vector.shape) == 3:
-            lvl=2
-        else:
-            raise(Exception('weird shape'))
-        shape_x = (block_vector.shape[0]-filt+1)*block_vector.shape[1]
-        shape_y = block_vector.shape[2]*filt
-        hankel = cp.zeros((shape_x,shape_y),dtype='complex64')
-
-        row_num = block_vector.shape[0]-filt+1
-        col_num = filt
-        row_size = block_vector.shape[1]
-        col_size = block_vector.shape[2]
-        for col in range(col_num):
-
-            for row in range(row_num):
-
-                hankel[row*row_size : (row+1)*row_size,\
-                        col*col_size : (col+1)*col_size] = \
-                                            block_vector[col+row,:,:]
-
-        return hankel
-
-    nd_data = cp.array(nd_data, dtype='complex64')
-
-    # getting level
-    if level == None: 
-        level = len(rp['filter_size'])
-
-    if level == 1:
-
-        raise(Exception('not implemented'))
-
-    if level == 2:    
-        # annihilating filter size
-        p, q = rp['filter_size']
-        # hankel m n
-        m, n = nd_data.shape[1:]
-        #init final shape
-        shape_x = (m-p+1)*(n-q+1)
-        shape_y = p*q*nd_data.shape[0]  # concatenate along receiver dimension
-        shape_x_lvl1 = m-p+1
-        shape_y_lvl1 = p
-        shape_x_rcvr = shape_x
-        shape_y_rcvr = shape_y//nd_data.shape[0]
-        
-        hankel_rcvr = cp.zeros((shape_x_rcvr,shape_y_rcvr),dtype='complex64')
-        hankel_lvl1_vec = cp.zeros((n,shape_x_lvl1,shape_y_lvl1),dtype='complex64')
-        hankel = cp.zeros((shape_x,shape_y),dtype='complex64')
-
-        for rcvr in range(nd_data.shape[0]):
-
-            for j in range(nd_data.shape[2]):
-               
-                vec = nd_data[rcvr,:,j]
-                hankel_lvl1 = _construct_hankel_level(vec,p)
-                hankel_lvl1_vec[j,:,:] = hankel_lvl1
-            hankel_rcvr = _construct_hankel_level(hankel_lvl1_vec,q)
-            hankel[:,rcvr*shape_y_rcvr:(rcvr+1)*shape_y_rcvr] = hankel_rcvr
-
-        return hankel
-
-    if level == 3:
-        raise(Exception('not implemented'))
 
 def init_kspace_stage(kspace_fiber,stage,rp):
     """Setup kspace for current pyramidal stage
@@ -629,7 +633,6 @@ def deconstruct_hankel(hankel,stage,rp):
         hankels = np.divide(vec,factors)
         return hankels
 
-    @numba.jit(nopython=True)
     def _make_factors(n,q):
         """Make array of Hankel block multiplicities for averaging
 
