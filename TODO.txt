@@ -4,9 +4,8 @@
 7. DOING : skipint decoder
 8. DO: decompose_hankel is slow, try numba
 9. DO: admm is slow, try numba
-10. DO: correct admm test
-11. DO: rewrite decompose hankel to return a projection
 12. DO: consider rp as namedtuple
+13. DO: admm test
 
 DONE:
 construct_hankel
@@ -14,3 +13,4 @@ deconstruct_hankel
 redo hankelutils
 put center kspace back at finish stage
 rewrite aloha testing, cstestio
+hankelavg kinda ok

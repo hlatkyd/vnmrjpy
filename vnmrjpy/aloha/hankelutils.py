@@ -11,6 +11,23 @@ Functions for handling Hankel matrices in various ALOHA implementations
 
 """
 DTYPE = 'complex64'
+
+def replace_zerofreq_kx(fiber,lines):
+    # put back old lines where division by zero occours
+    ind = fiber.shape[1]//2
+    radius = (lines.shape[1]-1)//2
+    print('radius {}'.format(radius))
+    fiber[:,ind-radius:ind+radius+1,:] = lines
+    return fiber
+
+def replace_zerofreq_ky(fiber,lines):
+
+    ind = fiber.shape[2]//2
+    radius = (lines.shape[2]-1)//2
+    fiber[:,:,ind-radius:ind+radius+1] = lines
+    return fiber
+    
+
 # this is to be deprecated, but works fine
 def construct_hankel_2d(slice3d,rp):
     """Make Hankel matrix from 2d+rcvrs data
@@ -137,23 +154,6 @@ def lvl2_hankel_weights(filter_shape,fiber_shape):
     # side-by-side concatenation as per receiverdim
     #full_weights = np.concatenate([full_weights for i in range(rcvrs)],axis=1)
     return full_weights
-    
-
-def average_hankel_fftconvolve(hankel,stage,rp,level=None):
-    """Averages elements in matrix according to the enforced hankel shape
-
-    Method: Work on full hankel at once, mask even blocks, average
-    anti-diagonals in rest, then do it again for the odd blocks
-    use scipys fftconvolve
-
-    Args:
-        hankel
-        stage
-        rp
-    Returns:
-        hankel_avg
-    """
-    pass
 
 # this is deprecated and slow
 def average_hankel(hankel,stage,rp,level=None):
@@ -295,20 +295,22 @@ def finish_kspace_stage(kspace_stage, kspace_full, stage_iter,rp):
         # saving original center
         center = copy.deepcopy(kspace_full[:,center_ind_pe-2:center_ind_pe+2,\
                                 center_ind_pe2-2:center_ind_pe2+2])
+        """
         if stage_iter == 0:  # kx weighting
             # saving original zero freq line
             zerofreq = copy.deepcopy(kspace_full[:,center_ind_pe-1:\
                                                     center_ind_pe,:])
             # putting back into the original
             kspace_full[:,ind_start:ind_end,ind2_start:ind2_end] = kspace_stage
-            kspace_full[:,center_ind_pe-1:center_ind_pe,:] = zerofreq
+            #kspace_full[:,center_ind_pe-1:center_ind_pe,:] = zerofreq
         elif stage_iter == 1:  # ky weighting
             zerofreq = copy.deepcopy(kspace_full[:,:,center_ind_pe2-1:\
                                                         center_ind_pe2])
             kspace_full[:,ind_start:ind_end,ind2_start:ind2_end] = kspace_stage
-            kspace_full[:,:,center_ind_pe2-1:center_ind_pe2] = zerofreq
-
+            #kspace_full[:,:,center_ind_pe2-1:center_ind_pe2] = zerofreq
+        """
         # putting back known center
+        kspace_full[:,ind_start:ind_end,ind2_start:ind2_end] = kspace_stage
 
         kspace_full[:,center_ind_pe-2:center_ind_pe+2,\
                         center_ind_pe2-2:center_ind_pe2+2] = center

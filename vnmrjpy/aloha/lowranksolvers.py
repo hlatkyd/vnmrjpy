@@ -220,9 +220,9 @@ def lmafit(init_data,known_data=None,\
 
 def admm(U,V,fiber_stage_known,stage,rp,\
                                     mu=1000,\
+                                    max_iter=100,\
                                     realtimeplot=False,\
-                                    noiseless=True,\
-                                    device='CPU'):
+                                    noiseless=True):
     """Alternating Direction Method of Multipliers solver for Aloha
 
 
@@ -242,22 +242,25 @@ def admm(U,V,fiber_stage_known,stage,rp,\
     Returns:
         hankel
     """
-    fiber_shape = rp['fiber_shape']
-    if len(fiber_shape) == 2:
+
+    fiber_shape = fiber_stage_known.shape
+    if len(fiber_shape) == 3:
         (rcvrs,m,n) = fiber_shape
         (p,q) = rp['filter_size']
         hankel_block_shape = (m-p+1,p)
     else:
         raise(Exception('not implemented yet'))
+
     hankel_mask = np.absolute(vj.aloha.construct_hankel(fiber_stage_known,rp))
     hankel_mask[hankel_mask != 0] = 1
     hankel_mask = np.array(hankel_mask,dtype='complex64')
     hankel_mask_inv = np.ones(hankel_mask.shape) - hankel_mask
 
     hankel0 = U.dot(V.conj().T)
-    hankel = U.dot(V.conj().T)
+    hankel = copy.copy(hankel0)
+    #hankel = U.dot(V.conj().T)
 
-    fiber_orig_part = copy.deepcopy(fiber_stage)
+    fiber_orig_part = copy.copy(fiber_stage_known)
     # TODO do thios one better
     hankel_orig_part = vj.aloha.construct_hankel(fiber_orig_part,rp)
     # init lagrangian update

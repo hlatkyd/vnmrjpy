@@ -31,12 +31,15 @@ def pyramidal_kxky(kspace_fiber,weights,rp):
                         than 3. please specify in config or pyramidal'))
     for s in range(rp['stages']):
 
+        zerofreq_lines = []
         for i in range(2):
 
             #start = time.time()
             weight = weights[2*s+i]
             # init known data for the solvers
             fiber_known = vj.aloha.init_kspace_stage(kspace_fiber,s,rp)
+            fiber_known_c = copy.copy(fiber_known)
+            # saving known center
             fiber_known = vj.aloha.apply_kspace_weights(fiber_known,weight)
             hankel_known = vj.aloha.construct_hankel(fiber_known,rp)
             # init data to be completed
@@ -57,17 +60,71 @@ def pyramidal_kxky(kspace_fiber,weights,rp):
                                         tol=lmafit_tolerance[s])
                 X,Y,obj = lmafit.solve(max_iter=100)
                 #lmafittime = time.time()
+                
                 #print('elapsed time for lmafit : {}'.format(lmafittime-inittime))
+                """old
                 admm = vj.aloha.Admm(X,Y.conj().T,fiber_known, s,rp,\
                                         realtimeplot=False)
                 hankel = admm.solve(max_iter=500)
+                """
+                hankel = vj.aloha.lowranksolvers.admm(X,Y.conj().T,fiber_known,s,\
+                                                                rp)
                 #admmtime = time.time()
                 #print('elapsed time for solvers : {}'.format(admmtime-lmafittime))
             fiber = vj.aloha.deconstruct_hankel(hankel,s,rp)
             fiber = vj.aloha.remove_kspace_weights(fiber,weight)
+            # this is for replacing zerofreq lines
+            radius = 0
+            if i == 0:
+                #saving  ky = 0
+                ind = fiber.shape[1]//2
+                zerofreq_kx = fiber_known_c[:,ind-radius:ind+radius+1,:]
+                fiber_norp = copy.copy(fiber)
+                ind = fiber.shape[2]//2        
+                zerofreq_ky = fiber[:,:,ind-radius:ind+1+radius]
+                #replace original kx = 0
+                fiber = vj.aloha.replace_zerofreq_kx(fiber,zerofreq_kx)
+                plt.subplot(1,3,1)
+                plt.imshow(np.absolute(fiber_norp[1,...]),cmap='gray',vmax=50,vmin=0)
+                plt.subplot(1,3,2)
+                plt.imshow(np.absolute(fiber[1,...]),cmap='gray',vmax=50,vmin=0)
+                plt.subplot(1,3,3)
+                plt.imshow(np.absolute(fiber_known_c[1,...]),cmap='gray',vmax=50,vmin=0)
+                plt.show()
+                fiber_wx = copy.copy(fiber)
+            if i == 1:
+                # saving kx = 0
+                ind = fiber.shape[1]//2
+                zerofreq_lines.append(fiber[:,ind-radius:ind+1+radius,:])
+                #replace ky from previous
+                fiber = vj.aloha.replace_zerofreq_ky(fiber,zerofreq_ky)
+                """
+                plt.subplot(1,4,1)
+                plt.imshow(np.absolute(fiber[1,50:150,:]),vmin=0,vmax=50,cmap='gray')
+                plt.subplot(1,4,2) 
+                plt.imshow(np.absolute(zerofreq_kx[1,:,:]),vmin=0,vmax=50,cmap='gray')
+                plt.title('kx zerofreq')
+                plt.subplot(1,4,3)
+                plt.imshow(np.absolute(zerofreq_ky[1,:,:]),vmin=0,vmax=50,cmap='gray')
+                plt.title('ky zerofreq')
+                plt.subplot(1,4,4)
+                plt.imshow(np.absolute(ind1fiber[1,:,:]),vmin=0,vmax=50,cmap='gray')
+                plt.title('ind1 fiber')
+                plt.show()
+                """
+                """
+                fiber_wy = copy.copy(fiber)
+                plt.subplot(1,2,1)
+                plt.imshow(np.absolute(fiber_wx[1,:,:]))
+                plt.subplot(1,2,2)
+                plt.imshow(np.absolute(fiber_wy[1,:,:]))
+                plt.show()
+                print('hello')
+                """
+            #fiber = np.minimum(fiber_wx, fiber_wy)
             kspace_fiber_complete = vj.aloha.finish_kspace_stage(\
                                         fiber,kspace_fiber_complete,i,rp)
-        
+
     return kspace_fiber_complete
             
 
@@ -113,9 +170,13 @@ def pyramidal_kt(kspace_fiber,weights,rp):
                                     realtimeplot=False,\
                                     tol=lmafit_tolerance[s])
             X,Y,obj = lmafit.solve(max_iter=500)
+            """ old
             admm = vj.aloha.Admm(X,Y.conj().T,fiber_known, s,rp,\
                                     realtimeplot=False)
             hankel = admm.solve()
+            """
+            hankel = vj.aloha.lowranksolvers.admm(X,Y.conj().T,fiber_known,s,\
+                                                    rp)
 
         fiber = vj.aloha.deconstruct_hankel(hankel,s,rp)
         fiber = vj.aloha.remove_kspace_weights(fiber,weight)

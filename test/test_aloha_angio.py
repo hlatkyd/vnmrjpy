@@ -22,7 +22,7 @@ class Test_Aloha_angio(unittest.TestCase):
 
         #plt.imshow(np.absolute(kspace_cs[0,:,40,:,0]))
         #plt.show()        
-        aloha = vj.aloha.Aloha(kspace_cs,procpar)
+        aloha = vj.aloha.Aloha(kspace_cs,procpar,check_only=True)
         kspace_filled = aloha.recon() 
         alohatest.save_test_cs_results(procpar,affine,savedir,\
                                 kspace_orig,kspace_cs,kspace_filled)

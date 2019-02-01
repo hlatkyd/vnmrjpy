@@ -8,6 +8,7 @@ import copy
 # check execution time
 TEST_PERFORMANCE=True
 ITER=100
+
 def plot_test(lst):
 
     n = len(lst)

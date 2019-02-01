@@ -22,7 +22,8 @@ class Aloha():
     def __init__(self, kspace_cs,\
                         procpar,\
                         kspace_orig=None,\
-                        reconpar=None):
+                        reconpar=None,\
+                        check_only=False):
         """Aloha parameter initialization
 
         Args:
@@ -84,7 +85,7 @@ class Aloha():
                                     kspace_shape[vj.config['pe_dim']],\
                                     kspace_shape[vj.config['et_dim']])
                 elif recontype in ['kx-ky']:
-                    filter_size = (11,11)
+                    filter_size = (21,21)
                     cs_dim = (vj.config['pe_dim'],vj.config['pe2_dim'])
                     ro_dim = vj.config['ro_dim']
                     stages = 3
@@ -92,7 +93,7 @@ class Aloha():
                                     kspace_shape[vj.config['pe_dim']],\
                                     kspace_shape[vj.config['pe2_dim']])
                 elif recontype in ['kx-ky_angio']:
-                    filter_size = (11,11)
+                    filter_size = (21,21)
                     cs_dim = (vj.config['pe_dim'],vj.config['pe2_dim'])
                     ro_dim = vj.config['ro_dim']
                     stages = 1
@@ -133,6 +134,7 @@ class Aloha():
         self.conf = vj.config
         self.kspace_cs = np.array(kspace_cs, dtype='complex64')
         self.weights = vj.aloha.make_kspace_weights(self.rp)
+        self.check = check_only
 
     def recon(self):
         """Main reconstruction method for Aloha
@@ -197,6 +199,30 @@ class Aloha():
             print('Processing Aloha reconstruction...')
             #------------------MAIN ITERATION----------------------------    
             for time in range(self.kspace_cs.shape[4]):
+            
+                # for testing only
+                if self.check:
+
+                    print('Filling center line only')
+                    # take center slice
+                    slc = self.kspace_cs.shape[self.rp['cs_dim'][1]]//2
+                    fiber3d = self.kspace_cs[:,:,slc,:,time]
+                    fiber3d_old = copy.copy(fiber3d)
+                    fiber3d = vj.aloha.pyramidal_kxky(fiber3d,\
+                                                    self.weights,\
+                                                    self.rp)
+                    plt.subplot(1,2,1)
+                    plt.imshow(np.absolute(fiber3d_old[1,:,:]),\
+                                            vmin=0,vmax=50,cmap='gray')
+                    plt.subplot(1,2,2)
+                    plt.imshow(np.absolute(fiber3d[1,:,:]),\
+                                            vmin=0,vmax=50,cmap='gray')
+                    plt.show()
+            
+                    print('slice {}/{} line {}/{} done.'.format(\
+                                slc+1,self.kspace_cs.shape[2],\
+                                time+1,self.kspace_cs.shape[4]))
+                    return
 
                 for slc in range(self.kspace_cs.shape[self.rp['cs_dim'][1]]):
 
