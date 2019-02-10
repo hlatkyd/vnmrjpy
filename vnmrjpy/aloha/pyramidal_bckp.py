@@ -32,11 +32,14 @@ def pyramidal_kxky(kspace_fiber,weights,rp,\
                         than 3. please specify in config or pyramidal'))
     for s in range(rp['stages']):
 
+        zerofreq_lines = []
         for i in range(2):
 
+            #start = time.time()
             weight = weights[2*s+i]
             # init known data for the solvers
             fiber_known = vj.aloha.init_kspace_stage(kspace_fiber,s,rp)
+            fiber_known_c = copy.copy(fiber_known)
             # saving known center
             fiber_known = vj.aloha.apply_kspace_weights(fiber_known,weight)
             hankel_known = vj.aloha.construct_hankel(fiber_known,rp)
@@ -44,6 +47,9 @@ def pyramidal_kxky(kspace_fiber,weights,rp,\
             kspace_stage = vj.aloha.init_kspace_stage(kspace_fiber_complete,s,rp)
             kspace_stage = vj.aloha.apply_kspace_weights(kspace_stage,weight)
             hankel = vj.aloha.construct_hankel(kspace_stage,rp)
+            #plt.imshow(np.absolute(hankel))
+            #inittime = time.time()
+            #print('elapsed time for init : {}'.format(inittime-start))
            
             if rp['solver'] == 'svt':
                 raise(Exception('not implemented'))
@@ -55,26 +61,114 @@ def pyramidal_kxky(kspace_fiber,weights,rp,\
                                         tol=lmafit_tolerance[s])
                 X,Y,obj = lmafit.solve(max_iter=500)
                 print('lmafit ready')
+                #lmafittime = time.time()
+                
+                #print('elapsed time for lmafit : {}'.format(lmafittime-inittime))
+                """old
+                admm = vj.aloha.Admm(X,Y.conj().T,fiber_known, s,rp,\
+                                        realtimeplot=False)
+                hankel = admm.solve(max_iter=500)
+                """
                 hankel = vj.aloha.lowranksolvers.admm(X,\
                                                     Y.conj().T,\
                                                     fiber_known,\
                                                     s,\
                                                     rp,\
                                                     realtimeplot=realtimeplot)
+                #admmtime = time.time()
+                #print('elapsed time for solvers : {}'.format(admmtime-lmafittime))
             fiber = vj.aloha.deconstruct_hankel(hankel,s,rp)
             fiber = vj.aloha.remove_kspace_weights(fiber,weight)
             # this is for replacing zerofreq lines
+            radius = 1
             if i == 0:
-                weights_x = weight
+                #saving  ky = 0
+                ind = fiber.shape[1]//2
+                zerofreq_kx = fiber_known_c[:,ind-radius:ind+radius+1,:]
+                fiber_norp = copy.copy(fiber)
+                ind = fiber.shape[2]//2        
+                zerofreq_ky = fiber[:,:,ind-radius:ind+1+radius]
+                #replace original kx = 0
+                fiber = vj.aloha.replace_zerofreq_kx(fiber,zerofreq_kx)
+                mask_diff = np.ones(fiber_known.shape)
+                mask_diff[fiber_known_c == 0] = 0
+                diff = np.multiply(fiber,mask_diff) - fiber_known_c
+                img = np.fft.fftshift(fiber,axes=(1,2))
+                img = np.fft.ifft2(img,axes=(1,2),norm='ortho')
+                img = np.fft.ifftshift(img,axes=(1,2))
+                plt.subplot(2,5,1)
+                plt.imshow(np.absolute(fiber_norp[1,...]),cmap='gray',vmax=50,vmin=0)
+                plt.title('filled stage 0')
+                plt.subplot(2,5,2)
+                plt.imshow(np.absolute(fiber[1,...]),cmap='gray',vmax=50,vmin=0)
+                plt.title('zerofreq replaced')
+                plt.subplot(2,5,3)
+                plt.imshow(np.absolute(fiber_known_c[1,...]),cmap='gray',vmax=50,vmin=0)
+                plt.title('orig')
+                plt.subplot(2,5,4)
+                plt.imshow(np.absolute(diff[1,...]),cmap='gray',vmax=50,vmin=0)
+                plt.title('diff where orig is nonzero')
+                plt.subplot(2,5,5)
+                plt.imshow(np.absolute(img[1,...]),cmap='gray')
+                plt.title('ifft from filled zf removed')
+                
                 fiber_wx = copy.copy(fiber)
             if i == 1:
-                weight_y = weight
-                fiber_wy = fiber
+                # saving kx = 0
+                ind = fiber.shape[1]//2
+                zerofreq_lines.append(fiber[:,ind-radius:ind+1+radius,:])
+                #replace ky from previous
+                fiber = vj.aloha.replace_zerofreq_ky(fiber,zerofreq_ky)
+                diff2 = np.multiply(fiber,mask_diff) - fiber_known_c
+                ind = fiber.shape[2]//2
+                
+                zerofreq_kx_stage1 = fiber[:,ind-radius:ind+1+radius,:]
+                #replace x zerofreq in stage 0 result
+                fiber_wx = vj.aloha.replace_zerofreq_kx(fiber_wx,zerofreq_kx_stage1)
+                plt.subplot(2,5,6)
+                plt.imshow(np.absolute(fiber[1,:,:]),vmin=0,vmax=50,cmap='gray')
+                plt.title('fiber stage1')
+                plt.subplot(2,5,7) 
+                plt.imshow(np.absolute(diff2[1,:,:]),vmin=0,vmax=50,cmap='gray')
+                plt.title('diff stage 2')
+                #plt.subplot(2,5,8)
+                #plt.imshow(np.absolute(zerofreq_ky[1,:,:]),vmin=0,vmax=50,cmap='gray')
+                #plt.title('ky zerofreq')
+                #plt.subplot(2,5,9)
+                #plt.imshow(np.absolute(ind1fiber[1,:,:]),vmin=0,vmax=50,cmap='gray')
+                #plt.title('ind1 fiber')
 
-        # averaging kx and ky completed fibers
-        fiber = vj.aloha.avg_xy_fibers(fiber_wx,fiber_wy,weight_x,weight_y)
-        # replacing center
-        kspace_fiber_complete = vj.aloha.finish_kspace_stage(\
+                # average stages
+
+                avgfin = (fiber + fiber_wx) / 2
+
+                img2 = np.fft.fftshift(avgfin,axes=(1,2))
+                img2 = np.fft.ifft2(img2,axes=(1,2),norm='ortho')
+                img2 = np.fft.ifftshift(img2,axes=(1,2))
+                
+                finimg = np.mean(np.absolute(img2),axis=0)
+                plt.subplot(2,5,8) 
+                plt.imshow(np.absolute(avgfin[1,:,:]),vmin=0,vmax=50,cmap='gray')
+                plt.title('average of 2')
+                plt.subplot(2,5,9) 
+                plt.imshow(np.absolute(img2[1,:,:]),vmin=0,vmax=50,cmap='gray')
+                plt.title('ifft of avgfin')
+                plt.subplot(2,5,10) 
+                plt.imshow(finimg,cmap='gray')
+                plt.title('final combined')
+                plt.show()
+                
+                """
+                fiber_wy = copy.copy(fiber)
+                plt.subplot(1,2,1)
+                plt.imshow(np.absolute(fiber_wx[1,:,:]))
+                plt.subplot(1,2,2)
+                plt.imshow(np.absolute(fiber_wy[1,:,:]))
+                plt.show()
+                print('hello')
+                """
+            #fiber = np.minimum(fiber_wx, fiber_wy)
+            kspace_fiber_complete = vj.aloha.finish_kspace_stage(\
                                         fiber,kspace_fiber_complete,i,rp)
 
     return kspace_fiber_complete

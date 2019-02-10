@@ -12,8 +12,26 @@ Functions for handling Hankel matrices in various ALOHA implementations
 """
 DTYPE = 'complex64'
 
+def avg_xy_fibers(fiber_x,fiber_y,weight_x,weight_y):
+    """Weighted average of same fiber completed with different weights.
+
+    In kx-ky completion the weighing is done sequentially in x and y
+    directions at a fixed stage
+
+    Args:
+        fiber_x,fiber_y (np.ndarray) -- unweighted fibers
+        weights_x,weight_y (np.ndarray) -- kspace weights
+    Return:
+        fiber (np.ndarray) -- averaged fiber
+    """
+    wx = np.absolute(weight_x)
+    wy = np.absolute(weight_y)
+    fiber = (wx*fiber_x+wy*fiber_y)/(wx+wy)
+    return fiber
+
 def replace_zerofreq_kx(fiber,lines):
-    # put back old lines where division by zero occours
+    """put back old lines where division by zero occours"""
+
     ind = fiber.shape[1]//2
     radius = (lines.shape[1]-1)//2
     print('radius {}'.format(radius))
@@ -118,10 +136,6 @@ def lvl2_hankel_average(hankel_full,filter_shape, fiber_shape):
         hankel_full[:,p*q*rcvr:p*q*(rcvr+1)] = hankel
 
     return hankel_full
-
-def lvl2_hankel_masks(filter_shape,fiber_shape):
-
-    pass
 
 def lvl2_hankel_weights(filter_shape,fiber_shape):
     """Make weights for the full 2 level hankel matrix.
