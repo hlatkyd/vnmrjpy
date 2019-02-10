@@ -22,7 +22,7 @@ class Test_Admm(unittest.TestCase):
         hankel_known = vj.aloha.construct_hankel(fiber_known,rp)
         X,Y,out = vj.aloha.lowranksolvers.lmafit(hankel_known, \
                                             known_data=hankel_known,\
-                                            realtimeplot=False)
+                                            realtimeplot=True)
         hankel_finished = vj.aloha.lowranksolvers.admm(X,Y.conj().T,\
                                                     fiber_orig,stage,rp,\
                                                     realtimeplot=True)

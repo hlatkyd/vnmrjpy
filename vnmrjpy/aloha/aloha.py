@@ -23,7 +23,8 @@ class Aloha():
                         procpar,\
                         kspace_orig=None,\
                         reconpar=None,\
-                        check_only=False):
+                        check_only=False,\
+                        realtimeplot=False):
         """Aloha parameter initialization
 
         Args:
@@ -135,6 +136,7 @@ class Aloha():
         self.kspace_cs = np.array(kspace_cs, dtype='complex64')
         self.weights = vj.aloha.make_kspace_weights(self.rp)
         self.check = check_only
+        self.realtimeplot = realtimeplot
 
     def recon(self):
         """Main reconstruction method for Aloha
@@ -182,8 +184,9 @@ class Aloha():
                     # main call for solvers
                     fiber3d = self.kspace_cs[:,:,x,slc,:]
                     fiber3d = vj.aloha.pyramidal_kt(fiber3d,\
-                                                    self.weights,\
-                                                    self.rp)
+                                                self.weights,\
+                                                self.rp,\
+                                                realtimeplot=self.realtimeplot)
                     kspace_completed[:,:,x,slc,:] = fiber3d
             
                     print('slice {}/{} line {}/{} done.'.format(\
@@ -209,8 +212,9 @@ class Aloha():
                     fiber3d = self.kspace_cs[:,:,slc,:,time]
                     fiber3d_old = copy.copy(fiber3d)
                     fiber3d = vj.aloha.pyramidal_kxky(fiber3d,\
-                                                    self.weights,\
-                                                    self.rp)
+                                                self.weights,\
+                                                self.rp,\
+                                                realtimeplot=self.realtimeplot)
                     plt.subplot(1,2,1)
                     plt.imshow(np.absolute(fiber3d_old[1,:,:]),\
                                             vmin=0,vmax=50,cmap='gray')

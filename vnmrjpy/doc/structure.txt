@@ -12,6 +12,7 @@
 			- csdatagen.py
 			- skipinttools.py {skipint handling class, etc}
 			- cstestio.py
+			- csfiberfetch.py
 		- recon
 			- __init__.py
 			- imake.py
@@ -44,8 +45,13 @@
 			- svt.py
 			- lowranksolvers.py
 		- fit {T1,T2,Dixon,etc}
+			- t2.py
+			- t2star.py
+			- ideal.py
 		{FILES}
 		- __init__.py
 		- setup.py
 		- README.md
 		- LICENCE
+
+	-test (all test files)

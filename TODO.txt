@@ -2,10 +2,9 @@
 2. ONGOING: kx ky wavelet in aloha
 5. DO: make aloha tests separate for each sequence
 7. DOING : skipint decoder
-8. DO: decompose_hankel is slow, try numba
-9. DO: admm is slow, try numba
 12. DO: consider rp as namedtuple
 13. DO: admm test
+14. Do: test single fibers for each sequence
 
 DONE:
 construct_hankel
