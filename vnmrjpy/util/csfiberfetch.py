@@ -1,5 +1,6 @@
 import vnmrjpy as vj
 import numpy as np
+import nibabel as nib
 
 class TestFiberFetcher():
 

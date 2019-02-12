@@ -14,6 +14,7 @@ class RealTimeImshow():
     """
     def __init__(self,init_data,cmap='gray',sleeptime=0.01):
 
+        plt.figure()
         self.sleeptime = sleeptime
         self.ax = plt.subplot(1,1,1)
         self.img = plt.imshow(init_data,cmap=cmap)

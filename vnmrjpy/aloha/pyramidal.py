@@ -5,6 +5,65 @@ import copy
 import matplotlib.pyplot as plt
 import time
 
+def pyramidal_k(kspace_fiber,weights,rp,\
+                    realtimeplot=False):
+    """ Pyramidal decomposition composit function for single k sparsity case.
+
+    Main Aloha unit.
+    One pyramidal decomposition and matrix completion is used at each readout
+    point. Thus, the different calls for this function are independent and
+    could be passed to the grid or GPU or whatever
+
+    Args:
+        kspace_fiber
+        weights
+        rp
+    Return:
+        kspace_fiber_complete
+    """
+    kspace_fiber_complete = copy.deepcopy(kspace_fiber)
+    if rp['stages'] == 3:
+        lmafit_tolerance = vj.config['lmafit_tol']
+    else:
+        raise(Exception('no lmafit tolerance at different number of stages\
+                        than 3. please specify in config or pyramidal'))
+    for s in range(rp['stages']):
+
+        weight = weights[s]
+        # init known data for the solvers
+        fiber_known = vj.aloha.init_kspace_stage(kspace_fiber,s,rp)
+        # saving known center
+        fiber_known = vj.aloha.apply_kspace_weights(fiber_known,weight)
+        hankel_known = vj.aloha.construct_lvl1_hankel(fiber_known,rp['filter_size'])
+        # init data to be completed
+        kspace_stage = vj.aloha.init_kspace_stage(kspace_fiber_complete,s,rp)
+        kspace_stage = vj.aloha.apply_kspace_weights(kspace_stage,weight)
+        hankel = vj.aloha.construct_lvl1_hankel(kspace_stage,rp['filter_size'])
+       
+        if rp['solver'] == 'svt':
+            raise(Exception('not implemented'))
+        elif rp['solver'] == 'lmafit':
+            lmafit = vj.aloha.Lmafit(hankel,\
+                                    known_data=hankel_known,\
+                                    verbose=False,\
+                                    realtimeplot=realtimeplot,\
+                                    tol=lmafit_tolerance[s])
+            X,Y,obj = lmafit.solve(max_iter=200)
+            hankel = vj.aloha.lowranksolvers.admm(X,\
+                                                Y.conj().T,\
+                                                fiber_known,\
+                                                s,\
+                                                rp,\
+                                                realtimeplot=realtimeplot,\
+                                                max_iter=40)
+        fiber = vj.aloha.deconstruct_hankel(hankel,s,rp)
+        fiber = vj.aloha.remove_kspace_weights(fiber,weight)
+        # replacing center
+        kspace_fiber_complete = vj.aloha.finish_kspace_stage(\
+                                        fiber,kspace_fiber_complete,0,rp)
+
+    return kspace_fiber_complete
+
 def pyramidal_kxky(kspace_fiber,weights,rp,\
                     realtimeplot=False):
     """ Pyramidal decomposition composit function for kx-ky sparsity case.

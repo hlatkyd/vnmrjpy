@@ -8,6 +8,6 @@ pip-selfcheck*
 # test result niftis
 #
 test/results/*
-__pycache__
+*__pycache__*
 *.swp
 *.pyc

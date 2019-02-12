@@ -60,6 +60,8 @@ class Aloha():
                 recontype = 'kx-ky_angio'
             elif 'mems' in self.p['pslabel']:
                 recontype = 'k-t'
+            elif 'gems' in self.p['pslabel']:
+                recontype = 'k'
             elif 'ge3d' in self.p['pslabel']:
                 recontype = 'kx-ky'
             else:
@@ -101,6 +103,13 @@ class Aloha():
                     fiber_shape = (kspace_shape[vj.config['rcvr_dim']],\
                                     kspace_shape[vj.config['pe_dim']],\
                                     kspace_shape[vj.config['pe2_dim']])
+                elif recontype in ['k']:
+                    filter_size = 15
+                    cs_dim = (vj.config['pe_dim'])
+                    ro_dim = vj.config['ro_dim']
+                    stages = 3
+                    fiber_shape = (kspace_shape[vj.config['rcvr_dim']],\
+                                    kspace_shape[vj.config['pe_dim']])
                 else:
                     raise(Exception('Not implemented'))
 
@@ -167,10 +176,27 @@ class Aloha():
             kspace_completed = copy.deepcopy(self.kspace_cs)
 
         #------------------------------------------------------------------
-        #                        1D :    kx
+        #                        1D :    k
         #------------------------------------------------------------------
-        if self.rp['recontype'] in ['kx']:
-            raise(Exception('dream on...'))
+        if self.rp['recontype'] == 'k':
+            print('Processing Aloha reconstruction...')
+            #------------------MAIN ITERATION----------------------------    
+            time = 0
+            for slc in range(self.kspace_cs.shape[3]):
+
+                for ro in range(self.kspace_cs.shape[vj.config['ro_dim']]):
+
+                    fiber3d = self.kspace_cs[:,:,ro,slc,time]
+                    fiber3d = vj.aloha.pyramidal_k(fiber3d,\
+                                                    self.weights,\
+                                                    self.rp)
+                    kspace_completed[:,:,ro,slc,time] = fiber3d
+            
+                    print('ro {}/{} slice {}/{} done.'.format(\
+                                ro+1,self.kspace_cs.shape[2],\
+                                slc+1,self.kspace_cs.shape[3]))
+
+            return kspace_completed
         #------------------------------------------------------------------
         #                        2D :    k-t
         #------------------------------------------------------------------

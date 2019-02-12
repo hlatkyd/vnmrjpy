@@ -3,29 +3,37 @@ import numba
 
 
 @numba.njit
-def avg_lvl1_hankel(hankel):
+def avg_lvl1_hankel(hankel_full,rcvrs):
     """Average matrix, assuming hankel structure
     
     Args:
         hankel (np.ndarray) -- matrix to average
+        rcvrs (int) -- receiver channels
     Returns:
         hankel (np.ndarray) -- finished matrix
     """
-    num_antidiag = hankel.shape[0]+hankel.shape[1]-1
-    # get indice pairs of each antidiagonal
-    for ind in range(num_antidiag):
-        antidiag_pairs = [[ind-j,j] for j in range(ind+1) \
-                        if (j<hankel.shape[1] and ind-j < hankel.shape[0])]
-        # avegage antidiagonals
-        avg = 0
-        for pair in antidiag_pairs:
-            avg += hankel[pair[0],pair[1]]
-        avg = avg / len(antidiag_pairs)
-        # putting back
-        for pair in antidiag_pairs:
-            hankel[pair[0],pair[1]] = avg
+    a = hankel_full.shape[1]//rcvrs
+    for rcvr in range(rcvrs):
 
-    return hankel
+        hankel = hankel_full[:,rcvr*a:(rcvr+1)*a]
+
+        num_antidiag = hankel.shape[0]+hankel.shape[1]-1
+        # get indice pairs of each antidiagonal
+        for ind in range(num_antidiag):
+            antidiag_pairs = [[ind-j,j] for j in range(ind+1) \
+                            if (j<hankel.shape[1] and ind-j < hankel.shape[0])]
+            # avegage antidiagonals
+            avg = 0
+            for pair in antidiag_pairs:
+                avg += hankel[pair[0],pair[1]]
+            avg = avg / len(antidiag_pairs)
+            # putting back
+            for pair in antidiag_pairs:
+                hankel[pair[0],pair[1]] = avg
+
+        hankel_full[:,rcvr*a:(rcvr+1)*a]
+
+    return hankel_full
 
 @numba.njit
 def avg_lvl2_hankel(hankel_full, block_shape, rcvrs):
@@ -34,6 +42,7 @@ def avg_lvl2_hankel(hankel_full, block_shape, rcvrs):
     Args:
         hankel (2D np.ndarray) -- input matrix to average
         block_shape (tuple) -- inner block shape
+        rcvrs (int) -- receiver channels
     Returns:
         hankel (2D np.ndarray) -- averaged matrix
 
@@ -149,6 +158,45 @@ def _hankel_lvl2(block_vector, filt):
     return hankel
 
 @numba.njit()
+def construct_lvl1_hankel(nd_data, filter_size):
+    """Contruct Level1 Hankel matrix
+
+    Args:
+        nd_data : (np.ndarray) -- input n dimensional data. dim 0 is assumed
+                                to be the receiver dimension
+        filter_size (int) -- annihilating filter size
+
+    Returns:
+        hankel (np.ndarray(x,y)) 2D multilevel Hankel matrix
+    """
+    # annihilating filter size
+    p = filter_size
+    # hankel m n
+    m = nd_data.shape[1:][0]
+    #init final shape
+    shape_x = m-p+1
+    shape_y = p*nd_data.shape[0]  # concatenate along receiver dimension
+    shape_x_lvl1 = m-p+1
+    shape_y_lvl1 = p
+    shape_x_rcvr = shape_x
+    shape_y_rcvr = shape_y//nd_data.shape[0]
+   
+    #hankel_rcvr = np.zeros((shape_x_rcvr,shape_y_rcvr),'complex64')
+    #hankel = np.zeros((shape_x,shape_y),'complex64')
+
+    hankel_rcvr = np.zeros((shape_x_rcvr,shape_y_rcvr),numba.complex64)
+    hankel = np.zeros((shape_x,shape_y),numba.complex64)
+    
+    for rcvr in range(nd_data.shape[0]):
+
+        vec = nd_data[rcvr,:]
+        hankel_rcvr = _hankel_lvl1(vec,p)
+
+        hankel[:,rcvr*shape_y_rcvr:(rcvr+1)*shape_y_rcvr] = hankel_rcvr
+
+    return hankel
+
+@numba.njit()
 def construct_lvl2_hankel(nd_data, filter_size):
     """Contruct Multilevel Hankel matrix
 
@@ -156,8 +204,6 @@ def construct_lvl2_hankel(nd_data, filter_size):
         nd_data : (np.ndarray) -- input n dimensional data. dim 0 is assumed
                                 to be the receiver dimension
         rp (dictionary) -- vnmrjpy aloha reconpar dictionary
-        order (list) -- multileveling order. list elements are the dimensions
-        level (int) -- number of levels (if None it is assumed from rp)
 
     Returns:
         hankel (np.ndarray(x,y)) 2D multilevel Hankel matrix

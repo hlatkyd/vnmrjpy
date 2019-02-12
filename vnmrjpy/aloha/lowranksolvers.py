@@ -222,7 +222,8 @@ def admm(U,V,fiber_stage_known,stage,rp,\
                                     mu=1000,\
                                     max_iter=100,\
                                     realtimeplot=False,\
-                                    noiseless=True):
+                                    noiseless=True,\
+                                    verbose=False):
     """Alternating Direction Method of Multipliers solver for Aloha
 
 
@@ -244,25 +245,41 @@ def admm(U,V,fiber_stage_known,stage,rp,\
     """
 
     fiber_shape = fiber_stage_known.shape
-    if len(fiber_shape) == 3:
+    if len(fiber_shape) == 3:  # this is kx-ky, angio and k-t
         (rcvrs,m,n) = fiber_shape
         (p,q) = rp['filter_size']
         hankel_block_shape = (m-p+1,p)
+        hankel_level = 2
+    elif len(fiber_shape) == 2:  # this is simple k, eg.: gems
+        (rcvrs,m) = fiber_shape
+        p = rp['filter_size']
+        hankel_block_shape = (m-p+1,p)
+        hankel_level = 1
     else:
         raise(Exception('not implemented yet'))
 
-    hankel_mask = np.absolute(vj.aloha.construct_hankel(fiber_stage_known,rp))
+    # init construction
+    fiber_orig_part = copy.copy(fiber_stage_known)
+    if hankel_level == 2:
+        hankel_orig_part = vj.aloha.construct_lvl2_hankel(\
+                                        fiber_orig_part,rp['filter_size'])
+        hankel_mask = np.absolute(vj.aloha.construct_lvl2_hankel(\
+                                        fiber_stage_known,rp['filter_size']))
+    elif hankel_level == 1:
+        hankel_orig_part = vj.aloha.construct_lvl1_hankel(\
+                                        fiber_orig_part,rp['filter_size'])
+        hankel_mask = np.absolute(vj.aloha.construct_lvl1_hankel(\
+                                        fiber_stage_known,rp['filter_size']))
+    #hankel_mask = np.absolute(vj.aloha.construct_hankel(fiber_stage_known,rp))
     hankel_mask[hankel_mask != 0] = 1
-    hankel_mask = np.array(hankel_mask,dtype='complex64')
+    hankel_mask = np.array(hankel_mask,dtype='complex64')  # where data is unknown
     hankel_mask_inv = np.ones(hankel_mask.shape) - hankel_mask
 
     hankel0 = U.dot(V.conj().T)
     hankel = copy.copy(hankel0)
     #hankel = U.dot(V.conj().T)
 
-    fiber_orig_part = copy.copy(fiber_stage_known)
     # TODO do thios one better
-    hankel_orig_part = vj.aloha.construct_hankel(fiber_orig_part,rp)
     # init lagrangian update
     lagr = np.zeros(hankel.shape,dtype='complex64')
     #lagr = copy.deepcopy(hankel)
@@ -270,6 +287,11 @@ def admm(U,V,fiber_stage_known,stage,rp,\
     vs = (V.conj().T.dot(V)).shape
     Iu = np.eye(us[0],us[1],dtype='complex64')
     Iv = np.eye(vs[0],vs[0],dtype='complex64')
+
+    if verbose:
+        
+        res = np.linalg.norm(hankel_mask*U.dot(V.conj().T)-hankel_orig_part)
+        print('mean error: {}'.format(res))
 
     # real time plotting for debugging purposes
     realtimeplot = realtimeplot
@@ -280,19 +302,13 @@ def admm(U,V,fiber_stage_known,stage,rp,\
     
         #start = time.time()
         # average the hankel structure, and put back original elements
-        hankel = vj.aloha.avg_lvl2_hankel(hankel,hankel_block_shape,rcvrs)
-        hankel = np.multiply(hankel,hankel_mask_inv) + hankel_orig_part
-        """
-        this is the old method
+        if hankel_level == 2:
+            hankel = vj.aloha.avg_lvl2_hankel(hankel,hankel_block_shape,rcvrs)
+        elif hankel_level == 1:
+            hankel = vj.aloha.avg_lvl1_hankel(hankel,rcvrs)
 
-        hankel_inferred_part = np.multiply(hankel-lagr,self.hankel_mask_inv)
-        #dtime = time.time()
-        fiber_inferred_part = vj.aloha.deconstruct_hankel(\
-                            hankel_inferred_part,s,rp)
-        #print('deconstruct time {}'.format(time.time()-dtime))
-        fiber = fiber_orig_part + fiber_inferred_part
-        hankel0 = vj.aloha.construct_hankel(fiber,rp)
-        """
+        #print('admm hankel shape {}'.format(hankel.shape))
+        hankel = np.multiply(hankel,hankel_mask_inv) + hankel_orig_part
         # updating U,V and the lagrangian
         #U_calc_inv = np.linalg.inv(Iv+mu*V.conj().T.dot(V))
         U = mu*(hankel0+lagr).dot(V).dot(\
@@ -303,6 +319,9 @@ def admm(U,V,fiber_stage_known,stage,rp,\
         hankel = U.dot(V.conj().T)
         lagr = hankel0 - hankel + lagr
 
+        if verbose:
+            res = np.linalg.norm(hankel_mask*U.dot(V.conj().T)-hankel_orig_part)
+            print('mean error: {}'.format(res))
         if realtimeplot == True:
             rtplot.update_data(np.absolute(hankel))
         #print('admm iter time {}'.format(time.time()-start))

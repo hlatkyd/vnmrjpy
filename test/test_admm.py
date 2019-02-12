@@ -6,6 +6,28 @@ import matplotlib.pyplot as plt
 
 class Test_Admm(unittest.TestCase):
 
+    def test_on_mems_data(self):
+
+        alohatest = vj.util.AlohaTest('offcenter',1)
+        fiber_orig, fiber_cs = alohatest.load_test_cs_fiber('mems',recontype='k-t')
+        rp = {'recontpye':'k-t','filter_size':(11,5),'vcboost':False,\
+                'stage':3,'rcvrs':4,'fiber_shape':fiber_cs.shape}
+        hankel_cs = vj.aloha.construct_hankel_2d(fiber_cs, rp)
+        hankel_orig = vj.aloha.construct_hankel_2d(fiber_orig,rp)
+        print('starting lmafit')
+        X,Y,out = vj.aloha.lowranksolvers.lmafit(hankel_cs, \
+                                            known_data=hankel_cs,\
+                                            realtimeplot=False)
+        stage=0
+        print('starting admm')
+        hankel_finished = vj.aloha.lowranksolvers.admm(X,Y.conj().T,\
+                                                    fiber_cs,stage,rp,\
+                                                    realtimeplot=True,\
+                                                    max_iter=200,\
+                                                    mu=1000,\
+                                                    verbose=True)
+        
+    """
     def test_run_admm(self):
         # this is just to check if it runs...
         shape = (4,192,192)
@@ -22,11 +44,11 @@ class Test_Admm(unittest.TestCase):
         hankel_known = vj.aloha.construct_hankel(fiber_known,rp)
         X,Y,out = vj.aloha.lowranksolvers.lmafit(hankel_known, \
                                             known_data=hankel_known,\
-                                            realtimeplot=True)
+                                            realtimeplot=False)
         hankel_finished = vj.aloha.lowranksolvers.admm(X,Y.conj().T,\
                                                     fiber_orig,stage,rp,\
                                                     realtimeplot=True)
+    """
+    
 
-
-
-
+    

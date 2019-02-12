@@ -273,6 +273,12 @@ def init_kspace_stage(kspace_fiber,stage,rp):
         kspace_init = kspace_fiber[:,kx_ind//2-kx_ind//2**(stage+1): \
                                     kx_ind//2+kx_ind//2**(stage+1),:] 
         
+    elif rp['recontype'] == 'k':
+
+        kx_ind = kspace_fiber.shape[1]
+        kspace_init = kspace_fiber[:,kx_ind//2-kx_ind//2**(stage+1): \
+                                    kx_ind//2+kx_ind//2**(stage+1)] 
+
     else:
         raise(Exception('not implemented'))
 
@@ -309,20 +315,6 @@ def finish_kspace_stage(kspace_stage, kspace_full, stage_iter,rp):
         # saving original center
         center = copy.deepcopy(kspace_full[:,center_ind_pe-2:center_ind_pe+2,\
                                 center_ind_pe2-2:center_ind_pe2+2])
-        """
-        if stage_iter == 0:  # kx weighting
-            # saving original zero freq line
-            zerofreq = copy.deepcopy(kspace_full[:,center_ind_pe-1:\
-                                                    center_ind_pe,:])
-            # putting back into the original
-            kspace_full[:,ind_start:ind_end,ind2_start:ind2_end] = kspace_stage
-            #kspace_full[:,center_ind_pe-1:center_ind_pe,:] = zerofreq
-        elif stage_iter == 1:  # ky weighting
-            zerofreq = copy.deepcopy(kspace_full[:,:,center_ind_pe2-1:\
-                                                        center_ind_pe2])
-            kspace_full[:,ind_start:ind_end,ind2_start:ind2_end] = kspace_stage
-            #kspace_full[:,:,center_ind_pe2-1:center_ind_pe2] = zerofreq
-        """
         # putting back known center
         kspace_full[:,ind_start:ind_end,ind2_start:ind2_end] = kspace_stage
 
@@ -344,6 +336,19 @@ def finish_kspace_stage(kspace_stage, kspace_full, stage_iter,rp):
 
         return kspace_full
     
+    elif rp['recontype'] == 'k':
+
+        pe_dim = 1  #TODO dimensions are not dynamic currently
+        center_ind_pe = kspace_full.shape[pe_dim]//2-1
+
+        ind_start = kspace_full.shape[pe_dim]//2 - kspace_stage.shape[pe_dim]//2
+        ind_end = kspace_full.shape[pe_dim]//2 + kspace_stage.shape[pe_dim]//2
+        #original center
+        center = copy.deepcopy(kspace_full[:,center_ind_pe-2:center_ind_pe+2])
+        kspace_full[:,ind_start:ind_end] = kspace_stage
+        kspace_full[:,center_ind_pe-2:center_ind_pe+2] = center
+
+        return kspace_full
     else:
         raise(Exception('not implemented yet'))
 
@@ -386,7 +391,20 @@ def make_kspace_weights(rp):
         rcvrs_eff = rp['rcvrs']
     
     # generate for each different case
-    if rp['recontype'] == 'k-t':
+    if rp['recontype'] == 'k':
+
+        kx_len = rp['fiber_shape'][1]
+        for s in range(rp['stages']):
+            w_samples = [2*np.pi/kx_len*k for k in\
+                         range(-int(kx_len/2**(s+1)),int(kx_len/2**(s+1)))]
+            w_arr = np.array([_haar_weights(s,i) for i in w_samples],\
+                                                            dtype='complex64')
+            w_arr = w_arr[np.newaxis,:]
+            weight_list.append(w_arr)
+
+        return weight_list
+
+    elif rp['recontype'] == 'k-t':
 
         kx_len = rp['fiber_shape'][1]
         kt_len = rp['fiber_shape'][2]
@@ -456,6 +474,9 @@ def make_kspace_weights(rp):
         weight_list.append(w_arr)
 
         return weight_list
+
+    elif rp['recontype'] == 'kx-ky-t':
+        raise(Exception('Not implemented yet!'))
 
 def apply_kspace_weights(kspace_fiber,weight):
     """Mutiply n-D kspace elements with the approppriate weights
@@ -605,6 +626,11 @@ def deconstruct_hankel(hankel,stage,rp):
         elif rp_recontype == 'k-t':
             (rcvrs,x,t) = rp_fiber_shape
             return (rcvrs,x//2**stage,t)
+        elif rp_recontype == 'k':
+            (rcvrs,x) = rp_fiber_shape
+            return (rcvrs,x//2**stage)
+        else:
+            raise(Exception('not implemented'))
     
     def _block_vector_from_col(col, height):
         """Make vector of blocks from a higher level Hankel column"""
@@ -668,9 +694,32 @@ def deconstruct_hankel(hankel,stage,rp):
     # init
     if rp['recontype'] in ['kx-ky','k-t','kx-ky_angio']:
         level = 2
+    elif rp['recontype'] in ['k']:
+        level = 1
     # work work 
     if level == 1:
-        raise(Exception('not implemented') )
+
+        # subinit level
+        (rcvrs,m) = _calc_fiber_shape(stage,rp['recontype'],rp['fiber_shape'])
+        p = rp['filter_size']  # annihilating filter
+        #number of hankel hankel block columns
+        cols_rcvr_lvl2 = hankel.shape[1]//(rcvrs*p) 
+        # zeroinit final output
+        nd_data = np.zeros((rcvrs,m),dtype='complex64')        
+
+        factors_lvl1 = _make_factors(m,p) # multiplicity of 1 block
+        
+        # decompose level2
+        for rcvr in range(rcvrs):
+
+            hankel_rcvr = hankel[:,rcvr*p:(rcvr+1)*p]
+            # decompose level1
+            elements = _deconstruct_hankel_level(hankel_rcvr,m,p,factors_lvl1)
+            nd_data[rcvr,:] = elements[:,0,0]  # dim 1,2 are single
+
+        #print('nd data shape {}'.format(nd_data.shape))
+        return nd_data
+
     elif level == 2:
         
         # subinit level
