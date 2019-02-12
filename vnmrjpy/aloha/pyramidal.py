@@ -65,7 +65,7 @@ def pyramidal_kxky(kspace_fiber,weights,rp,\
             fiber = vj.aloha.remove_kspace_weights(fiber,weight)
             # this is for replacing zerofreq lines
             if i == 0:
-                weights_x = weight
+                weight_x = copy.copy(weight)
                 fiber_wx = copy.copy(fiber)
             if i == 1:
                 weight_y = weight
