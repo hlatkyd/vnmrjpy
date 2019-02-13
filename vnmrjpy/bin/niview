@@ -1,15 +1,15 @@
-#!/usr/bin/python3
+#!/usr/bin/python3.6
 
 import os
-import matplotlib.pyplot as plt
 import numpy as np
 import nibabel as nib
 from argparse import ArgumentParser
-from readfdf import fdfReader
-from writenifti import niftiWriter
+import vnmrjpy as vj
+
 """
-Program to plot all slices of nifti simultaneously
+Simple program to plot all slices of nifti simultaneously
 """
+
 class niview():
 
     def __init__(self, nifti=None, axis=2, img=None):
@@ -23,10 +23,10 @@ class niview():
 
         elif img is not None:
 
-            fdfrdr = fdfReader(img)
+            fdfrdr = vj.io.FdfReader(img)
             (hdr, data) = fdfrdr.read() 
             procpar = fdfrdr.procpar
-            nwr = niftiWriter(procpar, data)
+            nwr = NiftiWriter(procpar, data)
             self.affine = nwr.aff
             self.data = data
             print('input img shape: {}'.format(self.data.shape))
@@ -37,44 +37,9 @@ class niview():
             return
         #finding dimension with 1 length
 
-    def quickplot(self):
-        """
-        This is for fast non-interactive plotting.
-        BETA USE ONLY
-        """
-        x_axis = 0 # TODO: make this dynamic
-        y_axis = 1
-        x_len = self.data.shape[x_axis]
-        y_len = self.data.shape[y_axis]
-        ncols = int(self.data.shape[self.axis] // \
-                np.sqrt(self.data.shape[self.axis]))
-        if np.sqrt(self.data.shape[self.axis]).is_integer():
-            nrows = int(ncols)
-
-        else:
-            nrows = int(ncols) + 1
-
-        img = np.zeros([self.data.shape[x_axis]*ncols,\
-                        self.data.shape[y_axis]*nrows])
-
-        # arranging the slices
-        for i in range(nrows):
-            for j in range(ncols):
-                try:
-                    img[i*x_len:(1+i)*x_len,j*y_len:(j+1)*y_len] = \
-                    self.data[:,:,i*ncols+j,0]
-                except:
-                    pass
-
-        plt.figure(figsize=(15,10))
-        plt.imshow(img, cmap='gray')
-        plt.tight_layout()
-        plt.show()
-
     def interactiveplot(self):
-        """
-        Using nibabel built-in viewer
-        """
+        """Using nibabel built-in viewer"""
+
         v = nib.viewers.OrthoSlicer3D(self.data, affine=self.affine)
         v.show()
 

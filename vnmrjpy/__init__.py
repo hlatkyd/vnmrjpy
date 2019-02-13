@@ -10,6 +10,7 @@ from . import aloha
 from . import recon
 from . import io
 from . import util
+from . import fit
 
 # declare for easy testing
 
