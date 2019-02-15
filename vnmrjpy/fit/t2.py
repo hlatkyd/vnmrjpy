@@ -3,9 +3,12 @@ import vnmrjpy as vj
 from scipy.ndimage import median_filter
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
+import copy
+import sys
+
+#TODO getting R2 error
 
 class T2Fitter():
-
 
     def __init__(self,img_data, echo_times=[],\
                                 procpar=None,\
@@ -26,7 +29,7 @@ class T2Fitter():
             fitmethod (str) -- 
             fitfunc (str) -- 
         """
-        # if no echo tie is specified get from procpar
+        # if no echo time is specified get from procpar
         def _check_echo_times(tdim, echo_list):
             if len(echo_list) == tdim and tdim != 0:
                 return True
@@ -39,7 +42,7 @@ class T2Fitter():
             # def constants
             bins = 100
 
-            imgmax = np.max(img_data)
+            imgmax = np.max(np.array(img_data,dtype=np.float64))
             hist, bin_edges = np.histogram(img_data, bins=bins, range=(0,imgmax))
             # probably most of image is noise
             noise_peak = np.amax(hist)
@@ -59,9 +62,11 @@ class T2Fitter():
             mask = np.repeat(mask[...,np.newaxis],img_data.shape[-1],axis=-1)
             return mask
 
+        # check data dimensions (should be 4)
+        if len(img_data.shape) != 4:
+            raise(Exception('Input data should have 4 dimensions')) 
         # sanity check for fitfunc
-
-        if fitfunc in ['3param_exp']:
+        if fitfunc in ['3param_exp','2param_exp']:
             pass
         else:
             raise(Exception('Cannot recognize fitfunc'))
@@ -90,7 +95,8 @@ class T2Fitter():
         self.mask = mask
         self.fitmethod = fitmethod  # some string option for later
         self.fitfunc = fitfunc
-        self.data = self.mask * self.data
+        self.data = np.array(self.mask * self.data,dtype=np.float64)
+        self.echo_times = np.array(self.echo_times,dtype=np.float64)
         self.noise_mean = _get_noise_mean(img_data)
 
     def fit(self): 
@@ -99,41 +105,103 @@ class T2Fitter():
         Return:
             (*fitted parameters)        
         """
-        def fit_3param_exp(data,echo_times, mask):
+        def fit_2param_exp(data,echo_times, mask):
 
-            def _3param_exp(te,A,B,T2):
-                return  A*np.exp(-te/T2) + B
+            def _2param_exp(x,T2,A):
+                y = A*np.exp(-x*1000/(T2*1000))
+                return y
 
-            t2map = np.zeros_like(data)
-            m0map = np.zeros_like(data)
-            const = np.zeros_like(data)
-            
+            t2map = np.zeros_like(data[...,0])
+            m0map = np.zeros_like(data[...,0])
+            et = self.echo_times
             nm = self.noise_mean
-            for x in range(data.shape[0]):
+            y_err = np.asarray([nm/5 for i in range(len(echo_times))])
+            print('Fitting 2 parameter exponential')
+            for z in range(data.shape[2]):
                 for y in range(data.shape[1]):
-                    for z in range(data.shape[2]):
-                        print(mask[x,y,z,0])
+                    for x in range(data.shape[0]):
+                        if mask[x,y,z,0] == 0:
+                            continue
+                        else:
+                            try:
+                                data_1d = data[x,y,z,:]
+                                y0 = data_1d[0]
+                                (t2,m0), cov  = curve_fit(_2param_exp,\
+                                                et,\
+                                                data_1d,\
+                                                p0=(0.03,y0*1.5),\
+                                                check_finite=False,\
+                                                bounds=([0,0],[0.2,y0*3]),\
+                                                method='trf')
+                                                #sigma=y_err,\
+                                                #absolute_sigma=True)
+                                m0map[x,y,z] = m0
+                                t2map[x,y,z] = t2
+                                x_fit = np.linspace(0,et[-1],100)
+                            except Exception:
+                                t2map[x,y,z] = guess[0]
+                                m0map[x,y,z] = guess[1]
+                            except KeyboardInterrupt:
+                                sys.exit(0)
+            return (t2map, m0map)
+
+        def fit_3param_exp(data,echo_times, mask):
+            """Standard 3 parameter wxponential fitting"""
+
+            def _3param_exp(x,T2,A,B):
+                y = A*np.exp(-x*1000/(T2*1000)) + B
+                return y
+
+            t2map = np.zeros_like(data[...,0])
+            m0map = np.zeros_like(data[...,0])
+            const = np.zeros_like(data[...,0])
+            
+            et = self.echo_times
+            nm = self.noise_mean
+            # init and bounds for estimated params B, T2,
+            #(A depends on intensity)
+            y_err = np.asarray([nm for i in range(len(echo_times))])
+            print('Fitting 3 parameter exponential')
+            for z in range(data.shape[2]):
+                for y in range(data.shape[1]):
+                    for x in range(data.shape[0]):
                         if mask[x,y,z,0] == 0:
                             continue
                         else:
                             data_1d = data[x,y,z,:]
-                            (m0,c,t2), cov  = curve_fit(_3param_exp,\
-                                                        data_1d,\
-                                                        self.echo_times,\
-                                                        p0=(0.03,1000,nm),\
-                                                        sigma=nm*2)
-                            m0map[x,y,z] = m0
-                            t2map[x,y,z] = t2
-                            print(t2*1000)
-                            const[x,y,z] = c
+                            y0 = data_1d[0]
+                            guess = (0.03,y0*1.5,nm)
+                            bounds = ([0,y0/2,nm/2],[0.5,y0*2,nm*3])
+                            try:
+                                (t2,m0,c), cov  = curve_fit(_3param_exp,\
+                                            et,\
+                                            data_1d,\
+                                            p0=guess,\
+                                            check_finite=False,\
+                                            bounds=bounds,\
+                                            method='trf',\
+                                            sigma=y_err,\
+                                            absolute_sigma=True)
+                                t2map[x,y,z] = t2
+                                m0map[x,y,z] = m0
+                                const[x,y,z] = c
+                            except Exception:
+                                t2map[x,y,z] = guess[0]
+                                m0map[x,y,z] = guess[1]
+                                const[x,y,z] = guess[2]
+                            except KeyboardInterrupt:
+                                sys.exit(0)
             return (t2map, m0map, const)
+
+        #---------------------------Switch cases ------------------------------
 
         if self.fitfunc == '3param_exp':        
             
-            (t2map, m0map, const) = fit_3param_exp(\
-                                    self.data,self.echo_times,self.mask)
+            return  fit_3param_exp(self.data,self.echo_times,self.mask)
 
-            return t2map
+        elif self.fitfunc == '2param_exp':        
+            
+            return fit_2param_exp(self.data,self.echo_times,self.mask)
 
 
 

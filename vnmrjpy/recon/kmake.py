@@ -3,12 +3,15 @@ import os
 import numpy as np
 import nibabel as nib
 import vnmrjpy as vj
+import warnings
+import matplotlib.pyplot as plt
 
 class KspaceMaker():
     """Class to build the k-space from the raw fid data based on procpar.
 
     Raw fid_data is numpy.ndarray(blocks, traces * np) format. Should be
     untangled based on 'seqcon' or 'seqfil' parameters.
+    seqcon chars refer to (echo, slice, Pe1, Pe2, Pe3)
 
     Should support compressed sensing
     In case of Compressed sensing the reduced kspace is filled with zeros
@@ -50,6 +53,7 @@ class KspaceMaker():
         apptype = self.p['apptype']
         self.config = vj.config
         self.verbose = verbose
+        self.procpar = procpar
         # decoding skipint parameter
         # TODO
         # final kspace shape from config file
@@ -99,7 +103,7 @@ class KspaceMaker():
 
             elif p['seqcon'] == 'nscnn':
 
-                pass
+                raise(Exception('not implemented'))
 
             elif p['seqcon'] == 'ncsnn':
 
@@ -134,15 +138,61 @@ class KspaceMaker():
 
                pass
  
-            pass
+            raise(Exception('not implemented'))
         def make_im2Depi():
-            pass
+            raise(Exception('not implemented'))
         def make_im2Depics():
-            pass
+            raise(Exception('not implemented'))
         def make_im2Dfse():
-            pass
+            warnings.warn('not working correctly')
+            kspace = self.pre_kspace
+            
+            p = self.p
+            petab = vj.util.getpetab(self.procpar,is_procpar=True)
+            print(petab)
+            nseg = int(p['nseg'])  # seqgments
+            etl = int(p['etl'])  # echo train length
+            kzero = int(p['kzero'])  
+            images = int(p['images'])  # repetitions
+            (read, phase, slices) = (int(p['np'])//2, \
+                                            int(p['nv']), \
+                                            int(p['ns']))
+            shiftaxis = (self.config['pe_dim'],self.config['ro_dim'])
+
+            echo = 1
+            time = images
+
+            if p['seqcon'] == 'nccnn':
+
+                preshape = (self.rcvrs, phase//etl, slices, echo*time, etl, read)
+                preshape2 = (self.rcvrs, slices, phase,echo*time, read )
+                #prepreshape = (self.rcvrs, etl*read, phase*slices*echo*time//etl)
+                #preshape = (self.rcvrs, echo*time*slices, phase//etl, read*etl)
+                shape = (self.rcvrs, echo*time, slices, phase, read)
+                #kspace = np.reshape(kspace, prepreshape, order='F')
+                #kspace = np.reshape(kspace, preshape, order='F')
+                kspace = np.reshape(kspace, preshape, order='C')
+                plt.subplot(1,4,1)
+                plt.imshow(np.absolute(kspace[1,:,4,0,0,:]))
+                plt.subplot(1,4,2)
+                plt.imshow(np.absolute(kspace[1,:,4,0,1,:]))
+                plt.subplot(1,4,3)
+                plt.imshow(np.absolute(kspace[1,:,4,0,2,:]))
+                kspace = np.swapaxes(kspace,1,3)
+                kspace = np.reshape(kspace, shape, order='C')
+                kspace = np.swapaxes(kspace,1,3)
+                plt.subplot(1,4,4)
+                plt.imshow(np.absolute(kspace[1,:,4,0,:]))
+                plt.show()
+                kspace = np.reshape(kspace, shape, order='C')
+                kspace = np.moveaxis(kspace, [0,4,1,2,3], self.dest_shape)
+            else:
+                raise(Exception('not implemented'))
+            
+            return kspace
+
         def make_im2Dfsecs():
-            pass
+            raise(Exception('not implemented'))
         def make_im3D():
 
             kspace = self.pre_kspace
@@ -271,7 +321,7 @@ class KspaceMaker():
             return kspace
 
         def make_im3Dute():
-            pass
+            raise(Exception('not implemented')) 
         # ----------------Handle sequence exceptions first---------------------
 
         if self.verbose == True:

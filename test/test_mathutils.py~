@@ -1,9 +1,0 @@
-import unittest
-import numpy as np
-import vnmrjpy as vj
-
-class Test_fftconvolve(unittest.TestCase):
-
-    def test_fftconvolve(self):
-
-        

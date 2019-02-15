@@ -183,6 +183,8 @@ class NiftiWriter():
         """
         if '.nii' in out:
             out_name = str(out)
+        elif '.nii.gz' in out:
+            out_name = str(out[:-3])
         else:
             out_name = str(out)+'.nii'
         img = nib.Nifti1Image(self.data, self.aff, self.hdr)
