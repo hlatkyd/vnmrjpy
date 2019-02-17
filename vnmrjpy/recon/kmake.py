@@ -162,33 +162,34 @@ class KspaceMaker():
             echo = 1
             time = images
 
+            phase_sort_order = np.reshape(np.array(petab),petab.size,order='C')
+            # shift to positive
+            phase_sort_order = phase_sort_order + phase_sort_order.size//2-1
+            print(phase_sort_order)
+
             if p['seqcon'] == 'nccnn':
 
+                #TODO check for images > 1
                 preshape = (self.rcvrs, phase//etl, slices, echo*time, etl, read)
-                preshape2 = (self.rcvrs, slices, phase,echo*time, read )
-                #prepreshape = (self.rcvrs, etl*read, phase*slices*echo*time//etl)
-                #preshape = (self.rcvrs, echo*time*slices, phase//etl, read*etl)
                 shape = (self.rcvrs, echo*time, slices, phase, read)
-                #kspace = np.reshape(kspace, prepreshape, order='F')
-                #kspace = np.reshape(kspace, preshape, order='F')
                 kspace = np.reshape(kspace, preshape, order='C')
-                plt.subplot(1,4,1)
-                plt.imshow(np.absolute(kspace[1,:,4,0,0,:]))
-                plt.subplot(1,4,2)
-                plt.imshow(np.absolute(kspace[1,:,4,0,1,:]))
-                plt.subplot(1,4,3)
-                plt.imshow(np.absolute(kspace[1,:,4,0,2,:]))
                 kspace = np.swapaxes(kspace,1,3)
                 kspace = np.reshape(kspace, shape, order='C')
+                # shape is [rcvrs, phase, slices, echo*time, read]
                 kspace = np.swapaxes(kspace,1,3)
-                plt.subplot(1,4,4)
-                plt.imshow(np.absolute(kspace[1,:,4,0,:]))
-                plt.show()
-                kspace = np.reshape(kspace, shape, order='C')
-                kspace = np.moveaxis(kspace, [0,4,1,2,3], self.dest_shape)
+                kspace_fin = np.zeros_like(kspace)
+                kspace_fin[:,phase_sort_order,:,:,:] = kspace
+                kspace_fin = np.moveaxis(kspace_fin, [0,4,1,2,3], self.dest_shape)
+                kspace = kspace_fin
             else:
                 raise(Exception('not implemented'))
             
+            if int(p['sliceorder']) == 1: # 1 if interleaved slices
+                c = np.zeros(kspace.shape, dtype=complex)
+                c[...,1::2,:] = kspace[...,slices//2:,:]
+                c[...,0::2,:] = kspace[...,:slices//2,:]
+                kspace = c
+
             return kspace
 
         def make_im2Dfsecs():

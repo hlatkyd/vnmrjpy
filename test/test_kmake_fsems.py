@@ -3,6 +3,8 @@ import numpy as np
 import unittest
 import glob
 import os
+import matplotlib.pyplot as plt
+
 
 class Test_kmake_fsems(unittest.TestCase):
 
@@ -26,7 +28,6 @@ class Test_kmake_fsems(unittest.TestCase):
 
         imaker = vj.recon.ImageSpaceMaker(kspace, procpar)
         imgspace = imaker.make()
-        
         writer = vj.io.NiftiWriter(np.absolute(kspace[1,...]),procpar)
         writer.write(outpath_k)
         writer = vj.io.NiftiWriter(np.absolute(imgspace[1,...]),procpar)
