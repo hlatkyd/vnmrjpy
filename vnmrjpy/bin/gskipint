@@ -5,11 +5,14 @@ import nibabel as nib
 from scipy.signal import gaussian
 import matplotlib.pyplot as plt
 from argparse import ArgumentParser
-from writenifti import niftiWriter
-from readprocpar import procparReader
+import vnmrjpy as vj
+
 #TODO give procpar as input and generate mask from that
 
-class skipintGenerator():
+
+# TODO this is getting deprecated, the new class is in vj.util.skipinttools
+
+class SkipintGenerator():
     """
     Compressed sensing sequences will use 'skipint' vnmrj parameter as in
     original Agilent sequence 'ge3d_elliptical'. This program 
@@ -45,7 +48,7 @@ class skipintGenerator():
 
         if dim==None or shape==None:
         
-            ppdict = procparReader(procpar).read()
+            ppdict = vj.io.ProcparReader(procpar).read()
 
             try:
                 self.time = int(ppdict['ne'])
@@ -234,7 +237,7 @@ class skipintGenerator():
 
         else:
             
-            writer = niftiWriter(self.procpar, self.kspace_mask)
+            writer = vj.io.NiftiWriter(self.kspace_mask, self.procpar)
             writer.write(out)
 
     def plot_check(self):
@@ -271,7 +274,7 @@ if __name__ == '__main__':
     #--------------------------------------------------------------------------
     if args.procpar != None:
         # generate from procpar data    
-        gen = skipintGenerator(procpar=args.procpar, reduction=float(args.reduction))
+        gen = SkipintGenerator(procpar=args.procpar, reduction=float(args.reduction))
 
     else:
         # if procpar is not given generate manually
@@ -283,7 +286,7 @@ if __name__ == '__main__':
             dim = 2
             shape = (args.shape[0], args.shape[1])
 
-        gen = skipintGenerator(dim,\
+        gen = SkipintGenerator(dim,\
                                 shape,\
                                 slices=int(args.slices),\
                                 time=int(args.time),\

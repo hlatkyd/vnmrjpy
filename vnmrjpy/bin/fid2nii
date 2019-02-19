@@ -4,13 +4,9 @@ import os
 import sys
 import numpy as np
 import nibabel as nib
-from readfid import fidReader
-from readprocpar import procparReader
-from writenifti import niftiWriter
-from imake import imgSpaceMaker
-from kmake import kSpaceMaker
 from argparse import ArgumentParser
 from shutil import copyfile
+import vnmrjpy as vj
 
 def fid2nii(indir,
             out=None,
@@ -21,7 +17,9 @@ def fid2nii(indir,
     if not os.path.isdir(indir):
         raise(Exception('Please specify input fid directory'))
 
+    costumout = True
     if out == None:
+        costumout = False
         # if output is not given, take fid as basename for new dir
         out = indir[:-4]+'.nifti/'
         if not os.path.exists(out):
@@ -29,29 +27,33 @@ def fid2nii(indir,
 
     fid = indir + '/fid'
     procpar = indir + '/procpar'
-    ppdict = procparReader(procpar).read()
-    fid_data, fid_header = fidReader(fid, procpar).read()
-    kspacemaker = kSpaceMaker(fid_data, procpar, fid_header)
-    kspace = kspacemaker.make()
-    imgspace = imgSpaceMaker(kspace, procpar).make() 
+    ppdict = vj.io.ProcparReader(procpar).read()
+    fid_data, fid_header = vj.io.FidReader(fid, procpar).read()
+    kspace = vj.recon.KspaceMaker(fid_data, fid_header, procpar).make()
+    kspace = vj.recon.KspaceCompleter(kspace, procpar).make()
+    imgspace = vj.recon.ImageSpaceMaker(kspace, procpar).make() 
 
     kspace_real = [] # put separate channel data into separate lements of list
     kspace_imag = []
+    
+    if save_kspace == True:
+        for i in range(len(ppdict['rcvrs'])):
+            kspace_real.append(np.real(kspace[i,...]))
+            kspace_imag.append(np.imag(kspace[i,...]))
+            writer1 = vj.io.NiftiWriter(kspace_real[-1], procpar)
+            writer1.write(out+'kspace_real_ch'+str(i))
+            writer2 = vj.io.NiftiWriter(kspace_imag[-1], procpar)
+            writer2.write(out+'kspace_imag_ch'+str(i))
 
-    for i in range(len(ppdict['rcvrs'])):
-        kspace_real.append(np.real(kspace[i,...]))
-        kspace_imag.append(np.imag(kspace[i,...]))
-        writer1 = niftiWriter(procpar, kspace_real[-1])
-        writer1.write(out+'kspace_real_ch'+str(i))
-        writer2 = niftiWriter(procpar, kspace_imag[-1])
-        writer2.write(out+'kspace_imag_ch'+str(i))
+    if save_imgspace == True:
+        sumimg = np.sum(np.absolute(imgspace), axis=0)
+        writer_img = vj.io.NiftiWriter(sumimg, procpar)
+        writer_img.write(out)
 
-    sumimg = np.sum(np.absolute(imgspace), axis=0)
-    writer_img = niftiWriter(procpar, sumimg)
-    writer_img.write(out+'imgspace_sum')
-
-    if saveprocpar == True:
+    if saveprocpar == True and costumout == True:
         copyfile(procpar, out+'/procpar')
+    elif saveprocpar == True and costumout == False:
+        copyfile(procpar, out+'.procpar')
 
 if __name__ == '__main__':
 

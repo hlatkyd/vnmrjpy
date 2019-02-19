@@ -2,13 +2,8 @@
 
 import sys
 import os
-sys.path.append('/home/david/dev/vnmrjpy')
-sys.path.append('/home/david/work/vnmrjpy')
-
 from argparse import ArgumentParser
-from readprocpar import procparReader
-from readfdf import fdfReader
-from readfid import fidReader
+import vnmrjpy as vj
 
 """
 Command line script to easily write headers to stdout.
@@ -20,7 +15,7 @@ Can recognise and parse:
 
     fdf
 
-    nifti
+    nifti -- this uses fsl
 
 WARNING WARING WARING  -- beta ... 
 
@@ -34,12 +29,12 @@ def print_fdf_header(infile):
 
     print('\nHeader of {} :\n'.format(infile))
 
-    reader = fdfReader(infile, printlines=True)
+    reader = vj.io.FdfReader(infile, printlines=True)
     reader.read()
 
 def print_fid_header(infile):
 
-    fid = fidReader(infile)
+    fid = vj.io.FidReader(infile)
     fid.print_header()
 
 if __name__ == '__main__':
