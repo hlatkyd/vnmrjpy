@@ -140,16 +140,38 @@ class KspaceMaker():
  
             raise(Exception('not implemented'))
         def make_im2Depi():
-            raise(Exception('not implemented'))
+
+            p = self.p
+            kspace = self.pre_kspace
+            print(kspace.shape)
+            nseg = p['nseg']
+            kzero = int(p['kzero'])  
+            images = int(p['images'])  # repetitions
+            time = images
+            print('images {}'.format(images))
+            print('nseg {}'.format(nseg))
+            print('ns {}'.format(p['ns']))
+            
+            if p['pro'] != 0:
+                (read, phase, slices) = (int(p['nread']), \
+                                            int(p['nphase']), \
+                                            int(p['ns']))
+            else:
+                (read, phase, slices) = (int(p['nread'])//2, \
+                                            int(p['nphase']), \
+                                            int(p['ns']))
+            
+            if p['seqcon'] == 'ncnnn':
+
+                pass    
+
         def make_im2Depics():
             raise(Exception('not implemented'))
         def make_im2Dfse():
-            warnings.warn('not working correctly')
+            warnings.warn('May not work correctly')
             kspace = self.pre_kspace
-            
             p = self.p
             petab = vj.util.getpetab(self.procpar,is_procpar=True)
-            print(petab)
             nseg = int(p['nseg'])  # seqgments
             etl = int(p['etl'])  # echo train length
             kzero = int(p['kzero'])  
@@ -165,7 +187,6 @@ class KspaceMaker():
             phase_sort_order = np.reshape(np.array(petab),petab.size,order='C')
             # shift to positive
             phase_sort_order = phase_sort_order + phase_sort_order.size//2-1
-            print(phase_sort_order)
 
             if p['seqcon'] == 'nccnn':
 
