@@ -148,6 +148,11 @@ class KspaceMaker():
             kzero = int(p['kzero'])  
             images = int(p['images'])  # repetitions
             time = images
+            if p['navigator'] == 'y':
+                pluspe = 1 + int(p['nnav'])  # navigator echo + unused
+            else:
+                pluspe = 1  # unused only
+            
             print('images {}'.format(images))
             print('nseg {}'.format(nseg))
             print('ns {}'.format(p['ns']))
@@ -163,7 +168,11 @@ class KspaceMaker():
             
             if p['seqcon'] == 'ncnnn':
 
-                pass    
+                preshape = (self.rcvrs, phase+pluspe, slices, time, read)
+                print(kspace.size)
+                tmp = np.zeros(preshape)
+                print(tmp.size)
+                kspace = np.reshape(kspace, preshape, order='c')
 
         def make_im2Depics():
             raise(Exception('not implemented'))
