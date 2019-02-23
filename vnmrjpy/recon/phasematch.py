@@ -2,6 +2,7 @@ import vnmrjpy as vj
 import numpy as np
 import time
 import os
+import matplotlib.pyplot as plt
 
 class Composer():
     """Match the phases of different receiver channels
@@ -26,19 +27,30 @@ class Composer():
 
         if workdir == None:
             timestr = time.strftime("%Y%m%d-%H%M%S")
-            self.workdir = '~/tmp_vnmrjpy/'+timestr
+            self.workdir = os.path.expanduser('~')+'/tmp_vnmrjpy/cmp'+timestr
         else:
             self.workdir = workdir
 
     def match(self, keepfiles=False):
 
+        def _ssos(data):
+            """Squared sum of squares from multichannel complex data"""
+            ssos = np.sqrt(np.mean(np.absolute(data),axis=0))
+            return ssos
+
         # make workdir if does not exist
         if not os.path.exists(self.workdir):
             os.makedirs(self.workdir)
-        print(self.workdir)
-        writer = vj.io.NiftiWriter(self.imgspace, self.procpar)
-        writer.write(self.workdir+'/composer_img_main')
-        writer = vj.io.NiftiWriter(self.imgspace_ref, self.procpar_ref)
-        writer.write(self.workdir+'/composer_ref_main')
 
-    
+        # testplot 
+        plt.subplot(1,2,1)
+        plt.imshow(_ssos(self.imgspace)[:,:,13,0])
+        plt.subplot(1,2,2)
+        plt.imshow(_ssos(self.imgspace_ref)[:,:,18,0])
+        plt.show()
+        writer = vj.io.NiftiWriter(_ssos(self.imgspace), self.procpar)
+        writer.write(self.workdir+'/composer_img_main')
+        writer = vj.io.NiftiWriter(_ssos(self.imgspace_ref), self.procpar_ref)
+        writer.write(self.workdir+'/composer_ref_main')
+    def match_from_nifti():
+        pass

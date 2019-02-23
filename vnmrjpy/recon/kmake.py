@@ -120,6 +120,8 @@ class KspaceMaker():
                 kspace = np.reshape(kspace, preshape, order='F')
                 kspace = np.reshape(kspace, shape, order='C')
                 kspace = np.moveaxis(kspace, [0,4,1,2,3], self.dest_shape)
+            else:
+                raise(Exception('Not implemented yet'))
 
             if int(p['sliceorder']) == 1: # 1 if interleaved slices
                 if slices % 2 == 0:
@@ -131,6 +133,7 @@ class KspaceMaker():
                     c = np.zeros(kspace.shape, dtype=complex)
                     c[...,0::2,:] = kspace[...,:(slices+1)//2,:]
                     c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]
+                    kspace = c
 
             return kspace
 
@@ -251,10 +254,10 @@ class KspaceMaker():
             if p['seqcon'] == 'nccsn':
             
                 preshape = (self.rcvrs,phase2,phase*echo*time*read)
-                shape = (self.rcvrs,phase,phase2,echo*time,read)
+                shape = (self.rcvrs,phase2,phase,echo*time,read)
                 kspace = np.reshape(kspace,preshape,order='F')
                 kspace = np.reshape(kspace,shape,order='C')
-                kspace = np.moveaxis(kspace, [0,4,1,2,3], self.dest_shape)
+                kspace = np.moveaxis(kspace, [0,4,2,1,3], self.dest_shape)
 
             if p['seqcon'] == 'ncccn':
                 #TODO fix 
