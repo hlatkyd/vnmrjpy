@@ -136,6 +136,25 @@ class FidReader():
     def print_header(self):
         """Prints fid header to stdout"""
 
-        print('----------- header---------------------')
+        print('---------------Fid header---------------------')
         for i in sorted(self.header_dict.keys()):
             print(str(i)+' = '+str(self.header_dict[i]))
+
+    # after read method
+    def print_blockheader(self):
+        
+        print('---------------block header-------------------')
+        for i in sorted(self.blockhead_dict.keys()):
+            print(str(i)+' = '+str(self.blockhead_dict[i]))
+        print('----------------------------------------------')
+
+
+
+
+
+
+
+
+
+
+

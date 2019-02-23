@@ -14,7 +14,7 @@ class FdfReader():
 
     """
 
-    def __init__(self, inPath, procpar=None, printlines=False):
+    def __init__(self, inPath, procpar=None, printlines=False, verbose=False):
         self.path = inPath
         self.procpar = procpar
         self.printlines = printlines
@@ -141,8 +141,8 @@ class FdfReader():
                 ppr = vj.io.ProcparReader(self.procpar)
                 self.ppdict = ppr.read()
             except:
-                print('\nFdfReader.read() warning : \
-                        Please specify procpar file!\n')
+                pass
+                #print('\nFdfReader.read() warning : Please specify procpar file!\n')
             fdf_list =[self.path]
             (header, data) = preproc_fdf(self.path)
             
