@@ -122,10 +122,15 @@ class KspaceMaker():
                 kspace = np.moveaxis(kspace, [0,4,1,2,3], self.dest_shape)
 
             if int(p['sliceorder']) == 1: # 1 if interleaved slices
-                c = np.zeros(kspace.shape, dtype=complex)
-                c[...,1::2,:] = kspace[...,slices//2:,:]
-                c[...,0::2,:] = kspace[...,:slices//2,:]
-                kspace = c
+                if slices % 2 == 0:
+                    c = np.zeros(kspace.shape, dtype=complex)
+                    c[...,1::2,:] = kspace[...,slices//2:,:]
+                    c[...,0::2,:] = kspace[...,:slices//2,:]
+                    kspace = c
+                else:
+                    c = np.zeros(kspace.shape, dtype=complex)
+                    c[...,0::2,:] = kspace[...,:(slices+1)//2,:]
+                    c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]
 
             return kspace
 
