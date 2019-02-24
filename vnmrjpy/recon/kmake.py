@@ -135,6 +135,7 @@ class KspaceMaker():
                     c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]
                     kspace = c
 
+            self.kspace = kspace
             return kspace
 
         def make_im2Dcs():
@@ -228,6 +229,7 @@ class KspaceMaker():
                 c[...,0::2,:] = kspace[...,:slices//2,:]
                 kspace = c
 
+            self.kspace = kspace
             return kspace
 
         def make_im2Dfsecs():
@@ -283,6 +285,7 @@ class KspaceMaker():
                 kspace = np.reshape(kspace,shape,order='C')
                 kspace = np.moveaxis(kspace, [0,4,1,2,3], self.dest_shape)
 
+            self.kspace = kspace
             return kspace
 
         def make_im3Dcs():
@@ -322,6 +325,7 @@ class KspaceMaker():
                             if skip_matrix[i,k] == 1:
                                 kspace[:,i,k,:,:] = pre_kspace[:,count,:,:]
                                 count = count+1
+                self.kspace = kspace
                 return kspace
 
             #------------------------im3Dcs make start -------------------------------
@@ -357,6 +361,7 @@ class KspaceMaker():
                 kspace = fill_kspace_3D(pre_kspace, skip_matrix, shape)
                 kspace = np.moveaxis(kspace, [0,4,1,2,3],[0,1,2,3,4])
                 
+            self.kspace = kspace
             return kspace
 
         def make_im3Dute():
