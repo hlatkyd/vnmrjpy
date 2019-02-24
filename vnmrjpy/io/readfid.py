@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import vnmrjpy as vj
 
 class FidReader():
     """Handles raw data from Varian spectrometer
@@ -37,10 +38,11 @@ class FidReader():
         """Decodes .fid file header"""
 
         if os.path.isdir(fid):
-            fid = str(fid)+'/fid'
             procpar = str(fid)+'/procpar'
+            self.procpar = procpar
+            fid = str(fid)+'/fid'
         else:            
-            pass
+            self.procpar = procpar
 
         def _decode_header():
 
@@ -149,8 +151,30 @@ class FidReader():
         print('----------------------------------------------')
 
 
+    
+    def make_image(self):
+        """Fully convert fid to 4D image as numpy array.
 
+        This is a convenience function for testing purposes, using this
+        is not advised for serious work. Relies on vj.recon mostly.
 
+        Return:
+            image (np.ndarray) -- summed image
+            affine -- affine for nibabel
+
+        """
+        def _ssos(data5D):
+            """Combine receivers with square root of sum of squares method"""
+            ssos = np.sqrt(np.mean(np.square(np.absolute(data5D)),axis=0))            
+            return ssos
+
+        data, header = self.read()
+        kspace = vj.recon.KspaceMaker(data, header, self.procpar).make()
+        imgspace = vj.recon.ImageSpaceMaker(kspace, self.procpar).make()
+        image = _ssos(imgspace)
+        nwr = vj.io.NiftiWriter(image, self.procpar)
+        return image, nwr.aff
+        
 
 
 

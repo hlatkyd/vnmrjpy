@@ -125,11 +125,13 @@ class KspaceMaker():
 
             if int(p['sliceorder']) == 1: # 1 if interleaved slices
                 if slices % 2 == 0:
+                    print('HERE')
                     c = np.zeros(kspace.shape, dtype=complex)
-                    c[...,1::2,:] = kspace[...,slices//2:,:]
                     c[...,0::2,:] = kspace[...,:slices//2,:]
+                    c[...,1::2,:] = kspace[...,slices//2:,:]
                     kspace = c
                 else:
+                    print('ITS HERE')
                     c = np.zeros(kspace.shape, dtype=complex)
                     c[...,0::2,:] = kspace[...,:(slices+1)//2,:]
                     c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]

@@ -4,6 +4,7 @@
 12. DO: consider rp as namedtuple
 15. DO: check ADMM convergence crit
 16. DO: 'k' simple 1d recon for gems
+17. gems interleaving is buggy. dont know why
 
 DONE:
 construct_hankel

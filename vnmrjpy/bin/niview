@@ -47,7 +47,7 @@ class Niview():
             procpar = fid + '/procpar'
             fid_data, fidhdr = vj.io.FidReader(fidfile, procpar).read()
             kspace = vj.recon.KspaceMaker(fid_data, fidhdr, procpar).make()
-            kspace = vj.recon.KspaceCompleter(kspace, procpar).make()
+            #kspace = vj.recon.KspaceCompleter(kspace, procpar).make()
             nwr = vj.io.NiftiWriter(kspace[0,...], procpar)
             self.affine = nwr.aff
             
@@ -72,14 +72,15 @@ class Niview():
                 if absolute == True:
                     if ch == None:
                         if addch ==True:
-                            rcvrlst = [np.absolute(data5d[i,...]) for i in range(data5d.shape[0])]
+                            rcvrlst = [np.absolute(data5d[i,...]) for i \
+                                                    in range(data5d.shape[0])]
                             self.data = np.mean(rcvrlst,axis=0)
                         elif addch == False:
                             # concatenate channels along time dimension
-                            rcvrlst = [np.absolute(data5d[i,...]) for i in range(data5d.shape[0])]
+                            rcvrlst = [np.absolute(data5d[i,...]) for i \
+                                                    in range(data5d.shape[0])]
                             self.data = np.concatenate(rcvrlst,axis=-1)
                     else:
-                        pass
                         raise(Exception('not implemented'))
                 # plot phase values
                 elif phase == True:
@@ -101,6 +102,7 @@ class Niview():
     def interactiveplot(self):
         """Using nibabel built-in viewer"""
 
+        print('Plotting...')
         v = nib.viewers.OrthoSlicer3D(self.data, affine=self.affine)
         v.show()
 
@@ -130,6 +132,9 @@ if __name__ == '__main__':
         print('Reading .fid file in .fid direcory ...')
         if args.phase:
             nv = Niview(fid=str(args.nifti),phase=args.phase, absolute=False)
+            nv.interactiveplot()
+        else:
+            nv = Niview(fid=str(args.nifti),absolute=True)
             nv.interactiveplot()
     else:
         print('Wrong input: not a .nii/.fid/.img file or dir')
