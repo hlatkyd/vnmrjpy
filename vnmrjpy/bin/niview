@@ -21,30 +21,33 @@ class Niview():
 
     Intended to work from the command line.
     """
-    def __init__(self, nifti=None, img=None,\
+    def __init__(self, nifti=None, img=None,to_scanner=True,\
                 fid=None, showkspace=False, ch=None, addch=True,\
-                absolute=True, magn=False, phase=False, imag=False, real=False):  # fid options
+                absolute=True, magn=False, phase=False,\
+                imag=False, real=False):  # fid options
+
+        self.transform = to_scanner
 
         if nifti is not None:
             self.img = nib.load(nifti)
             self.data = self.img.get_fdata()
             self.affine = self.img.affine
-            print('input nifti shape: {}'.format(self.data.shape))
 
         elif img is not None:
 
             fdfrdr = vj.io.FdfReader(img)
             data, hdr = fdfrdr.read() 
             procpar = fdfrdr.procpar
+            self.procpar = procpar
             nwr = vj.io.NiftiWriter(data, procpar)
             self.affine = nwr.aff
             self.data = data
-            print('input img shape: {}'.format(self.data.shape))
                 
         elif fid is not None:
             # reading fid gets more options:
             fidfile = fid + '/fid'
             procpar = fid + '/procpar'
+            self.procpar = procpar
             fid_data, fidhdr = vj.io.FidReader(fidfile, procpar).read()
             kspace = vj.recon.KspaceMaker(fid_data, fidhdr, procpar).make()
             #kspace = vj.recon.KspaceCompleter(kspace, procpar).make()
@@ -92,7 +95,6 @@ class Niview():
                     else:
                         raise(Exception('not implemented'))
 
-
         else:
 
             print('Possibly wrong input. Quitting ...')
@@ -100,18 +102,33 @@ class Niview():
         #finding dimension with 1 length
 
     def interactiveplot(self):
-        """Using nibabel built-in viewer"""
+        """Using nibabel built-in viewer
 
-        print('Plotting...')
-        v = nib.viewers.OrthoSlicer3D(self.data, affine=self.affine)
+
+        dim 1 is flipped because natural y axis is up->down
+        """
+        if self.transform:
+            try:
+                self.data = vj.util.to_scanner_space(self.data,self.procpar)
+                self.affine = np.eye(4)
+            except:
+                raise
+        self.data = np.flip(self.data,axis=1)
+        # default to cubic affine, this should be close
+        affine = vj.util.make_cubic_affine(self.data)
+        v = nib.viewers.OrthoSlicer3D(self.data, affine=affine)
         v.show()
 
 if __name__ == '__main__':
 
-    parser = ArgumentParser()
+    description="""Command-line script to process and plot .fid, .fdf, .nii
+                for quick checks."""
+
+    parser = ArgumentParser(description=description)
     parser.add_argument('nifti')
     parser.add_argument('--phase',action='store_true')
     parser.add_argument('--magn',action='store_true')
+    parser.add_argument('--kspace',action='store_true')
     args = parser.parse_args()
     if str(args.nifti).endswith('.nii') or \
         str(args.nifti).endswith('.nii.gz'):
@@ -130,11 +147,21 @@ if __name__ == '__main__':
     elif str(args.nifti).endswith('.fid') and\
         os.path.isdir(str(args.nifti)):
         print('Reading .fid file in .fid direcory ...')
-        if args.phase:
-            nv = Niview(fid=str(args.nifti),phase=args.phase, absolute=False)
-            nv.interactiveplot()
+        if args.kspace:
+            if args.phase:
+                nv = Niview(fid=str(args.nifti),phase=args.phase,\
+                    absolute=False,showkspace=True)
+                nv.interactiveplot()
+            else:
+                nv = Niview(fid=str(args.nifti),absolute=True,showkspace=True)
+                nv.interactiveplot()
         else:
-            nv = Niview(fid=str(args.nifti),absolute=True)
-            nv.interactiveplot()
+            if args.phase:
+                nv = Niview(fid=str(args.nifti),phase=args.phase,\
+                    absolute=False)
+                nv.interactiveplot()
+            else:
+                nv = Niview(fid=str(args.nifti),absolute=True)
+                nv.interactiveplot()
     else:
         print('Wrong input: not a .nii/.fid/.img file or dir')

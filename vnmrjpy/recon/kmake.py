@@ -80,8 +80,25 @@ class KspaceMaker():
         Return: 
             kspace=numpy.ndarray([rcvrs,phase,readout,slice,echo/time])
         """
+        def _check_arrayed_params(ppdict):
+            """Look for vnmrj "arrayed" parameters, for setup
+
+            Might be: TR, TE, etc. Should be put into 'time' dimension
+            """
+            pass
+
+        def _is_interleaved(ppdict):
+            res  = (int(ppdict['sliceorder']) == 1)
+            return res
+        def _is_evenslices(ppdict):
+            try:
+                res = (int(ppdict['ns']) % 2 == 0)
+            except:
+                res = (int(ppdict['pss']) % 2 == 0)
+            return res
         def make_im2D():
             """Child method of 'make', provides the same as vnmrj im2Drecon"""
+    
             kspace = self.pre_kspace
             p = self.p
             (read, phase, slices) = (int(p['np'])//2, \
@@ -94,12 +111,11 @@ class KspaceMaker():
                 echo = 1
 
             time = 1
-
+            
             if p['seqcon'] == 'nccnn':
                 shape = (self.rcvrs, phase, slices, echo*time, read)
                 kspace = np.reshape(kspace, shape, order='C')
-                kspace = np.moveaxis(kspace, [0,4,1,2,3], self.dest_shape)
-
+                kspace = np.moveaxis(kspace, [0,1,4,2,3], self.dest_shape)
 
             elif p['seqcon'] == 'nscnn':
 
@@ -111,7 +127,7 @@ class KspaceMaker():
                 shape = (self.rcvrs, phase, slices, echo*time, read)
                 kspace = np.reshape(kspace, preshape, order='F')
                 kspace = np.reshape(kspace, shape, order='C')
-                kspace = np.moveaxis(kspace, [0,4,1,2,3], self.dest_shape)
+                kspace = np.moveaxis(kspace, [0,1,4,2,3], self.dest_shape)
 
             elif p['seqcon'] == 'ccsnn':
 
@@ -119,25 +135,29 @@ class KspaceMaker():
                 shape = (self.rcvrs, phase, slices, echo*time, read)
                 kspace = np.reshape(kspace, preshape, order='F')
                 kspace = np.reshape(kspace, shape, order='C')
-                kspace = np.moveaxis(kspace, [0,4,1,2,3], self.dest_shape)
+                kspace = np.moveaxis(kspace, [0,1,4,2,3], self.dest_shape)
             else:
                 raise(Exception('Not implemented yet'))
-
-            if int(p['sliceorder']) == 1: # 1 if interleaved slices
-                if slices % 2 == 0:
-                    print('HERE')
-                    c = np.zeros(kspace.shape, dtype=complex)
-                    c[...,0::2,:] = kspace[...,:slices//2,:]
-                    c[...,1::2,:] = kspace[...,slices//2:,:]
-                    kspace = c
+            if _is_interleaved(p): # 1 if interleaved slices
+                # TODO this fix should not be here 
+                # TODO # think of something less shameful
+                if vj.util.disgustingworkaroundforpossiblebug(p) == False:
+                    if _is_evenslices(p):
+                        c = np.zeros(kspace.shape, dtype='complex64')
+                        c[...,0::2,:] = kspace[...,:slices//2,:]
+                        c[...,1::2,:] = kspace[...,slices//2:,:]
+                        kspace = c
+                    else:
+                        c = np.zeros(kspace.shape, dtype='complex64')
+                        c[...,0::2,:] = kspace[...,:(slices+1)//2,:]
+                        c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]
+                        kspace = c
                 else:
-                    print('ITS HERE')
-                    c = np.zeros(kspace.shape, dtype=complex)
-                    c[...,0::2,:] = kspace[...,:(slices+1)//2,:]
-                    c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]
-                    kspace = c
-
+                    pass
             self.kspace = kspace
+            #aff = vj.io.NiftiWriter(np.absolute(kspace[1,...]),self.procpar).aff
+            #ni = nib.viewers.OrthoSlicer3D(np.absolute(kspace[1,...]),affine = aff)
+            #ni.show()
             return kspace
 
         def make_im2Dcs():
@@ -220,16 +240,22 @@ class KspaceMaker():
                 kspace = np.swapaxes(kspace,1,3)
                 kspace_fin = np.zeros_like(kspace)
                 kspace_fin[:,phase_sort_order,:,:,:] = kspace
-                kspace_fin = np.moveaxis(kspace_fin, [0,4,1,2,3], self.dest_shape)
+                kspace_fin = np.moveaxis(kspace_fin, [0,1,4,2,3], self.dest_shape)
                 kspace = kspace_fin
             else:
                 raise(Exception('not implemented'))
             
-            if int(p['sliceorder']) == 1: # 1 if interleaved slices
-                c = np.zeros(kspace.shape, dtype=complex)
-                c[...,1::2,:] = kspace[...,slices//2:,:]
-                c[...,0::2,:] = kspace[...,:slices//2,:]
-                kspace = c
+            if _is_interleaved(p): # 1 if interleaved slices
+                if _is_evenslices(p):
+                    c = np.zeros(kspace.shape, dtype='complex64')
+                    c[...,0::2,:] = kspace[...,:slices//2,:]
+                    c[...,1::2,:] = kspace[...,slices//2:,:]
+                    kspace = c
+                else:
+                    c = np.zeros(kspace.shape, dtype='complex64')
+                    c[...,0::2,:] = kspace[...,:(slices+1)//2,:]
+                    c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]
+                    kspace = c
 
             self.kspace = kspace
             return kspace
@@ -261,15 +287,15 @@ class KspaceMaker():
                 shape = (self.rcvrs,phase2,phase,echo*time,read)
                 kspace = np.reshape(kspace,preshape,order='F')
                 kspace = np.reshape(kspace,shape,order='C')
-                kspace = np.moveaxis(kspace, [0,4,2,1,3], self.dest_shape)
+                kspace = np.moveaxis(kspace, [0,2,4,1,3], self.dest_shape)
+                kspace = np.flip(kspace,axis=3)
 
             if p['seqcon'] == 'ncccn':
-                #TODO fix 
                 preshape = (self.rcvrs,phase2,phase*echo*time*read)
                 shape = (self.rcvrs,phase,phase2,echo*time,read)
                 kspace = np.reshape(kspace,preshape,order='F')
                 kspace = np.reshape(kspace,shape,order='C')
-                kspace = np.moveaxis(kspace, [0,4,1,2,3], self.dest_shape)
+                kspace = np.moveaxis(kspace, [0,2,4,1,3], self.dest_shape)
     
             if p['seqcon'] == 'cccsn':
             
@@ -277,15 +303,13 @@ class KspaceMaker():
                 shape = (self.rcvrs,phase,phase2,echo*time,read)
                 kspace = np.reshape(kspace,preshape,order='F')
                 kspace = np.reshape(kspace,shape,order='C')
-                kspace = np.moveaxis(kspace, [0,4,1,2,3], self.dest_shape)
+                kspace = np.moveaxis(kspace, [0,2,4,1,3], self.dest_shape)
 
             if p['seqcon'] == 'ccccn':
                 
-                #preshape = (self.rcvrs,phase*phase2*echo*time*read)
                 shape = (self.rcvrs,phase2,phase,echo*time,read)
-                #kspace = np.reshape(kspace,preshape,order='F')
                 kspace = np.reshape(kspace,shape,order='C')
-                kspace = np.moveaxis(kspace, [0,4,1,2,3], self.dest_shape)
+                kspace = np.moveaxis(kspace, [0,2,4,1,3], self.dest_shape)
 
             self.kspace = kspace
             return kspace
@@ -361,7 +385,7 @@ class KspaceMaker():
                 pre_shape = (self.rcvrs, pre_phase, echo*time, read)
                 pre_kspace = np.reshape(kspace, pre_shape, order='c')
                 kspace = fill_kspace_3D(pre_kspace, skip_matrix, shape)
-                kspace = np.moveaxis(kspace, [0,4,1,2,3],[0,1,2,3,4])
+                kspace = np.moveaxis(kspace, [0,1,4,2,3],[0,1,2,3,4])
                 
             self.kspace = kspace
             return kspace
@@ -376,46 +400,52 @@ class KspaceMaker():
 
         if str(self.p['seqfil']) == 'ge3d_elliptical':
            
-            return make_im3Dcs()
+            kspace = make_im3Dcs()
 
         #--------------------------Handle by apptype---------------------------
 
         if self.p['apptype'] == 'im2D':
 
-            return make_im2D()
+            kspace = make_im2D()
 
         elif self.p['apptype'] == 'im2Dcs':
 
-            return make_im2Dcs()
+            kspace = make_im2Dcs()
 
         elif self.p['apptype'] == 'im2Depi':
 
-            return make_im2Depi()
+            kspace = make_im2Depi()
 
         elif self.p['apptype'] == 'im2Depics':
 
-            return make_im2Depics()
+            kspace = make_im2Depics()
 
         elif self.p['apptype'] == 'im2Dfse':
 
-            return make_im2Dfse()
+            kspace = make_im2Dfse()
 
         elif self.p['apptype'] == 'im2Dfsecs':
 
-            return make_im2Dfsecs()
+            kspace = make_im2Dfsecs()
 
         elif self.p['apptype'] == 'im3D':
 
-            return make_im3D()
+            kspace = make_im3D()
 
         elif self.p['apptype'] == 'im3Dcs':
 
-            return make_im3Dcs()
+            kspace = make_im3Dcs()
 
         elif self.p['apptype'] == 'im3Dute':
 
-            return make_im3Dute()
+            kspace = make_im3Dute()
 
         else:
             raise(Exception('Could not find apptype. Maybe not implemented?'))
+
+        # ---------------------Global modifications on Kspace------------------
+
+        #TODO if slices are in reversed order, flip them
+
+        return kspace
 

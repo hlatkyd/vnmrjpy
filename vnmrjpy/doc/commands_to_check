@@ -1,0 +1,4 @@
+flush Write out data in VNMR memory
+focus Send keyboard focus to input window
+create('rftempcomp','string','global') Parameter used for RF transmitter board temperature compensation(P)
+vacuumdb vnmr --analyze (to linux chron)
