@@ -30,6 +30,9 @@ class Composer():
             self.workdir = os.path.expanduser('~')+'/tmp_vnmrjpy/cmp'+timestr
         else:
             self.workdir = workdir
+        # temporary workdir for testing
+        self.workdir = '/home/david/dev/vnmrjpy/test/results/composertest'
+
 
     def match(self, keepfiles=False):
 

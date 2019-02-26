@@ -2,7 +2,7 @@ import vnmrjpy as vj
 import numpy as np
 from math import sin, cos
 
-def _get_swap_array(orient):
+def get_swap_array(orient):
     """Gives how to reorder and flip the axes to fit scanner space
 
     [phase, readout, slice] -> [x,y,z]
@@ -93,7 +93,7 @@ def make_scanner_affine(procpar):
     else:
         raise(Exception)
 
-    swaparr, flipaxis = _get_swap_array(p['orient'])
+    swaparr, flipaxis = get_swap_array(p['orient'])
     sortedarr = sorted(zip(swaparr,arr))
     arr = [sortedarr[i][1] for i in range(3)]+[1.0]
     affine = np.array(np.eye(4,dtype=float)*arr,dtype=float)

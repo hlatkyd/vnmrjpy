@@ -36,4 +36,6 @@ class KspaceCompleter():
 
             aloha = vj.aloha.Aloha(self.kspace,self.procpar,reconpar=rp)
             return aloha.recon()
-            
+    
+    def to_global(self):
+        pass            
