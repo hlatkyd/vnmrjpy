@@ -116,6 +116,9 @@ class Niview():
         self.data = np.flip(self.data,axis=1)
         # default to cubic affine, this should be close
         affine = vj.util.make_cubic_affine(self.data)
+        print(affine)
+        affine = vj.util.make_scanner_affine(self.procpar)
+        print(affine)
         v = nib.viewers.OrthoSlicer3D(self.data, affine=affine)
         v.show()
 

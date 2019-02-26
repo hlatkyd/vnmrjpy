@@ -2,6 +2,41 @@ import vnmrjpy as vj
 import numpy as np
 from math import sin, cos
 
+def _get_swap_array(orient):
+    """Gives how to reorder and flip the axes to fit scanner space
+
+    [phase, readout, slice] -> [x,y,z]
+    
+    Used with np.moveaxes
+
+    Args:
+        orient -- procpar parameter 'orient'
+    Returns:
+        arr -- sequence of new axes
+        flipaxis
+    """
+    if orient == 'trans':
+        arr = [0,1,2]
+        flipaxis = None
+    elif orient == 'trans90':
+        arr = [1,0,2]
+        flipaxis = 1
+    elif orient == 'sag':
+        arr = [2,0,1]
+    elif orient == 'sag90': 
+        arr = [2,1,0]
+        flipaxis = None
+    elif orient == 'cor':
+        arr = [0,2,1]
+        flipaxis = 1
+    elif orient == 'cor90': 
+        arr = [1,2,0]
+        flipaxis = None
+    else:
+        raise(Exception('Other orientations not implemented'))
+
+    return arr, flipaxis
+
 def make_cubic_affine(data):
     """Make Nifti affine assuming imaging volume is a cube
 
@@ -23,10 +58,47 @@ def make_scanner_affine(procpar):
     """Make appropriate global affine for Nifti header.
 
     This is needed for viewing and saving nifti in scanner space
-    """ 
+    Prabably safer to do it from scratch than transforming...
+    Translations are accounted for. Gaps are added to thinckness
+    
+    Args:
+        data (np.ndarra) -- input data, 4D or 5D
+        procpar 
+    Return:
+        affine (np.ndarray) -- 4x4 diagonal matrix
+    """
     p = vj.io.ProcparReader(procpar).read()
     orient = p['orient']
+    # epip and other have different parameter names on phase and readout matrix
+    if 'epip' not in p['pslabel']:
+        phase = int(p['np'])//2
+        read = int(p['nv'])
+        # these are in cm!
+        lro = float(p['lro'])*10
+        lpe = float(p['lpe'])*10
+        if '2D' in p['apptype']:
+            slices = int(p['ns'])
+            thk = float(p['thk'])
+            gap = float(p['gap'])
+            arr = [lpe/phase,lro/read,(thk+gap)]
+        elif '3D' in p['apptype']:
+            phase2 = int(p['nv2'])
+            lpe2 = float(p['lpe2'])*10
+            arr = [lpe/phase,lro/read,lpe2/phase2]
+        else:
+            raise(Exception)
+            
+    elif 'epip' in p['pslabel']:
+        pass
+    else:
+        raise(Exception)
 
+    swaparr, flipaxis = _get_swap_array(p['orient'])
+    sortedarr = sorted(zip(swaparr,arr))
+    arr = [sortedarr[i][1] for i in range(3)]+[1.0]
+    affine = np.array(np.eye(4,dtype=float)*arr,dtype=float)
+    return affine
+    
 def check_90deg(procpar):
     """Make sure all rotations are multiples of 90deg
 
@@ -71,57 +143,21 @@ def to_scanner_space(data, procpar):
         This was done to avoid thinking. Would benefit from rewriting.
         """
         dims = len(data.shape)
-        
-        if orient == 'trans':
-            pass
-        if orient == 'trans90':
-            if dims == 3:
-                data = np.swapaxes(data,0,1)
-                data = np.flip(data,axis=1)
-            elif dims == 4:
-                data = np.swapaxes(data,0,1)
-                data = np.flip(data,axis=1)
-            elif dims == 5:
-                data = np.swapaxes(data,1,2)
-                data = np.flip(data,axis=2)
-        if orient == 'sag':
-            if dims == 3:
-                data = np.swapaxes(data,0,1)
-                data = np.swapaxes(data,0,2)
-            elif dims == 4:
-                data = np.swapaxes(data,0,1)
-                data = np.swapaxes(data,0,2)
-            elif dims == 5:
-                data = np.swapaxes(data,1,2)
-                data = np.swapaxes(data,1,3)
-        if orient == 'sag90':
-            if dims == 3:
-                data = np.swapaxes(data,0,2)
-            elif dims == 4:
-                data = np.swapaxes(data,0,2)
-            elif dims == 5:
-                data = np.swapaxes(data,1,3)
-        if orient == 'cor':
-            if dims == 3:
-                data = np.swapaxes(data,1,2)
-                data = np.flip(data,axis=1)
-            elif dims == 4:
-                data = np.swapaxes(data,1,2)
-                data = np.flip(data,axis=1)
-            elif dims == 5:
-                data = np.swapaxes(data,2,3)
-                data = np.flip(data,axis=2)
-        if orient == 'cor90':
-            if dims == 3:
-                data = np.swapaxes(data,0,1)
-                data = np.swapaxes(data,1,2)
-            elif dims == 4:
-                data = np.swapaxes(data,0,1)
-                data = np.swapaxes(data,1,2)
-            elif dims == 5:
-                data = np.swapaxes(data,1,2)
-                data = np.swapaxes(data,2,3)
-        
+        newarr, flipaxis = _get_swap_array(orient)  
+        if dims == 3:
+            data = np.moveaxis(data, [0,1,2], newarr)
+        elif dims == 4:
+            newarr = newarr+[3]
+            data = np.moveaxis(data, [0,1,2,3], newarr)
+        elif dims == 5:
+            if flipaxis != None:
+                flipaxis = flipaxis+1
+            newarr = [0]+newarr+[4]
+            data = np.moveaxis(data, [0,1,2,3,4], newarr)
+
+        if flipaxis != None:
+            data = np.flip(data, axis=flipaxis) 
+
         # correct in case X gradient is inverted
         if vj.config['swap_x_grad']:
             if dims == 3 or dims == 4:
