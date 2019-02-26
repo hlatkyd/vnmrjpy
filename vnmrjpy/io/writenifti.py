@@ -34,67 +34,44 @@ class NiftiWriter():
             affine = vj.util.make_scanner_affine(self.procpar)
             return affine
 
-        def _make_local_matrix():
-
-            if self.ppdict['apptype'] in ['im2Depi']:
-                dread = float(self.ppdict['lro']) / float(self.ppdict['nread'])*2*10
-                dphase = float(self.ppdict['lpe']) / float(self.ppdict['nphase'])*10
-                dslice = float(self.ppdict['thk'])+float(self.ppdict['gap'])
-                matrix = (int(self.ppdict['nphase']),int(self.ppdict['nread'])//2)
-                dim = np.array([dphase,dread,dslice])
-            if self.ppdict['apptype'] in ['im2Dfse','im2D']:
-                dread = float(self.ppdict['lro']) / float(self.ppdict['np'])*2*10
-                dphase = float(self.ppdict['lpe']) / float(self.ppdict['nv'])*10
-                dslice = float(self.ppdict['thk'])+float(self.ppdict['gap'])
-                matrix = (int(self.ppdict['nv']),int(self.ppdict['np'])//2)
-                dim = np.array([dphase,dread,dslice])
-            if self.ppdict['apptype'] in ['im3D','im3Dshim']:
-                dread = float(self.ppdict['lro']) / float(self.ppdict['np'])*2*10
-                dphase = float(self.ppdict['lpe']) / float(self.ppdict['nv'])*10
-                dphase2 = float(self.ppdict['lpe2']) / float(self.ppdict['nv2'])*10
-                matrix = (int(self.ppdict['nv']),\
-                            int(self.ppdict['np'])//2,\
-                            int(self.ppdict['nv2']))
-                dim = np.array([dphase,dread,dphase2])
-
-            return matrix
-
-
         def _make_scanner_header():
             """Make Nifti header from scratch"""
 
             p = self.ppdict
-            swaparr, flipaxis = vj.util.get_swap_array(p['orient'])
+            swaparr, flipaxis, sliceaxis = vj.util.get_swap_array(p['orient'])
             header = nib.nifti1.Nifti1Header()
-            matrix = _make_local_matrix()
+            matrix_orig, dim_orig = vj.util.make_local_matrix(self.ppdict)
+            matrix = vj.util.swapdim(swaparr,matrix_orig)
+            print(matrix)
             
-            #
-            dim_info
             if self.ppdict['apptype'] in ['im3D','im3Dshim']:
                 header.set_data_shape(matrix)
-                header.set_dim_info(phase=1,freq=0,slice=2)
                 header.set_xyzt_units(xyz='mm')
                 header.set_qform(aff, code='scanner')
 
-            elif self.ppdict['apptype'] in ['im2D']:
-                header.set_data_shape(matrix)
-                header.set_dim_info(phase=0,freq=1,slice=2)
-                header.set_xyzt_units(xyz='mm')
-                header.set_qform(aff, code='scanner')
-
-            elif self.ppdict['apptype'] in ['im2Dfse','im2Depi']:
-                header.set_data_shape(matrix)
-                header.set_dim_info(slice=2,phase=1,freq=0)
-                header.set_xyzt_units(xyz='mm')
-                header.set_qform(aff, code='scanner')
-                if self.ppdict['apptype'] == 'im2Depi':
-                    header.set_slice_duration(float(self.ppdict['slicetr']))
-
+            elif self.ppdict['apptype'] in ['im2D','im2Dfse','im2Dcs']:
+                #header.set_xyzt_units(xyz='mm')
+                header.set_qform(self.affine, code=1)
+                #header['qform_code'] = 1
+        
+                header['xyzt_units'] = 2
+                header['dim'][0] = 4
+                header['dim'][1] = matrix[0]
+                header['dim'][2] = matrix[1]
+                header['dim'][3] = matrix[2]
+                header['dim'][4] = 1
+                header['intent_name'] = 'THEINTENT'
+                header['aux_file'] = 'THEAUXILIARYFILE'
+                print(header['dim'])
+            else:
+                raise(Exception('not implemented'))
+    
             return header
 
 
         # ----------------------------MAIN INIT--------------------------------
-
+        
+        self.procpar = procpar
         self.verbose = verbose
         ppr = vj.io.ProcparReader(procpar)
         self.ppdict = ppr.read()
@@ -121,7 +98,11 @@ class NiftiWriter():
                 raise(Exception('Not implemented yet'))
             # this is the standard
             if from_local==True and self.coordinate_system=='scanner':
+                print('niftiwriter HERE')
+                print(self.data.shape)
                 self.data = vj.util.to_scanner_space(self.data, self.procpar)
+                # check for X gradient reversion
+                #self.data = vj.util.corr_x_flip(self.data)
                 self.affine = vj.util.make_scanner_affine(self.procpar)
                 self.header = _make_scanner_header()
             else:
@@ -143,7 +124,10 @@ class NiftiWriter():
             out_name = str(out[:-3])
         else:
             out_name = str(out)+'.nii'
-        img = nib.Nifti1Image(self.data, self.affine, self.hdr)
+        print(self.data.shape)
+        img = nib.Nifti1Image(self.data, self.affine, self.header)
+        print('final header')
+        print(img.header['dim'])
         #img.update_header()
         nib.save(img,out_name)
         os.system('gzip -f '+str(out_name))

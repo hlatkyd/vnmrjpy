@@ -2,6 +2,29 @@ import vnmrjpy as vj
 import numpy as np
 from math import sin, cos
 
+def flip_sliceaxis(data,sliceaxis,sliceorder):            
+    """Flip slice after transform to scanner space
+
+    """
+    # this is reversed now: actually flip if 'rev slices' is unchecked
+
+    # flip slice, so increasing order is up->down, left->right,s->n
+    if sliceorder < 2:  # this means 'rev order' is unchecked
+        if len(data.shape) < 5:
+            data = np.flip(data,axis=sliceaxis)
+        elif len(data.shape) == 5:
+            data = np.flip(data,axis=(sliceaxis+1))
+    return data
+
+def corr_x_flip(data):
+    """Check and correct X gradient polarity flip"""
+    if vj.config['swap_x_grad']:
+        if len(data.shape) < 5:
+            data = np.flip(data,axis=0)
+        elif len(data.shape) == 5:
+            data = np.flip(data,axis=1)
+    return data
+
 def get_swap_array(orient):
     """Gives how to reorder and flip the axes to fit scanner space
 
@@ -13,29 +36,36 @@ def get_swap_array(orient):
         orient -- procpar parameter 'orient'
     Returns:
         arr -- sequence of new axes
-        flipaxis
+        flipaxis -- axis to flip
+        sliceaxis -- axis of slice encoding
     """
     if orient == 'trans':
         arr = [0,1,2]
         flipaxis = None
+        sliceaxis = 2
     elif orient == 'trans90':
         arr = [1,0,2]
         flipaxis = 1
+        sliceaxis = 2
     elif orient == 'sag':
         arr = [2,0,1]
+        sliceaxis = 0
     elif orient == 'sag90': 
         arr = [2,1,0]
         flipaxis = None
+        sliceaxis = 0
     elif orient == 'cor':
         arr = [0,2,1]
         flipaxis = 1
+        sliceaxis = 1
     elif orient == 'cor90': 
         arr = [1,2,0]
         flipaxis = None
+        sliceaxis = 1
     else:
         raise(Exception('Other orientations not implemented'))
 
-    return arr, flipaxis
+    return arr, flipaxis, sliceaxis
 
 def make_cubic_affine(data):
     """Make Nifti affine assuming imaging volume is a cube
@@ -93,7 +123,7 @@ def make_scanner_affine(procpar):
     else:
         raise(Exception)
 
-    swaparr, flipaxis = get_swap_array(p['orient'])
+    swaparr, flipaxis, sliceaxis = get_swap_array(p['orient'])
     sortedarr = sorted(zip(swaparr,arr))
     arr = [sortedarr[i][1] for i in range(3)]+[1.0]
     affine = np.array(np.eye(4,dtype=float)*arr,dtype=float)
@@ -117,7 +147,11 @@ def check_90deg(procpar):
     else:
         return False
 
-def to_scanner_space(data, procpar):
+def to_rg_space(indata,procpar):
+    """Compatibility space"""
+    pass
+
+def to_scanner_space(indata, procpar):
     """Transform data to scanner coordinate space by properly swapping axes
 
     Standard vnmrj orientation - meaning rotations are 0,0,0 - is axial, with
@@ -129,6 +163,9 @@ def to_scanner_space(data, procpar):
     is also desirable in some cases (for example registration in FSL flirt)
 
     Euler angles of rotations are psi, phi, theta,
+
+    Also corrects reversed X gradient and sliceorder
+
     Args:
         data (3,4, or 5D np ndarray) -- input data to transform
         procpar (path/to/file) -- Varian procpar file of data
@@ -137,13 +174,15 @@ def to_scanner_space(data, procpar):
         swapped_data (np.ndarray)
     """
 
-    def _orthotransform(data,orient):
+    def _orthotransform(data,p):
         """Simple swaping of axes in case of orthogonal scanner-image axes
 
         This was done to avoid thinking. Would benefit from rewriting.
         """
+        orient = p['orient']
+        sliceorder = int(p['sliceorder'])
         dims = len(data.shape)
-        newarr, flipaxis = _get_swap_array(orient)  
+        newarr, flipaxis, sliceaxis = get_swap_array(orient)  
         if dims == 3:
             data = np.moveaxis(data, [0,1,2], newarr)
         elif dims == 4:
@@ -159,14 +198,10 @@ def to_scanner_space(data, procpar):
             data = np.flip(data, axis=flipaxis) 
 
         # correct in case X gradient is inverted
-        if vj.config['swap_x_grad']:
-            if dims == 3 or dims == 4:
-                data = np.flip(data,axis=0)
-            elif dims == 5:
-                data = np.flip(data,axis=1)
-        
+        data = corr_x_flip(data)
+        # correct reversed slice order
+        data = flip_sliceaxis(data,sliceaxis,sliceorder)         
         return data
-                
 
     #TODO this is for later, for more sophisticated uses perhaps
     def _calc_matrix(p):
@@ -184,7 +219,7 @@ def to_scanner_space(data, procpar):
                     -sin(theta)*cos(psi)],\
             [sin(theta)*sin(phi), sin(theta)*cos(phi), cos(theta)]]
     #-------------------------------main--------------------------------
-    if len(data.shape) == 4 or len(data.shape) == 5:
+    if len(indata.shape) == 4 or len(indata.shape) == 5:
         pass
     else:
         raise(Exception('Only 3d, 4d or 5d data allowed'))
@@ -192,7 +227,7 @@ def to_scanner_space(data, procpar):
 
     if check_90deg(procpar) == True:
         
-        return _orthotransform(data, p['orient'])
+        return _orthotransform(indata, p)
     
     else:
         raise(Exception('Only supported with rotations of multiples of 90deg'))

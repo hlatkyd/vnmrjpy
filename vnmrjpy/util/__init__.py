@@ -13,3 +13,4 @@ from .cstestio import *
 from .readpetable import *
 from .transform import *
 from .disgusting import *
+from .niftiutils import *

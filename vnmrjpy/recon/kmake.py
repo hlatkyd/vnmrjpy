@@ -139,25 +139,17 @@ class KspaceMaker():
             else:
                 raise(Exception('Not implemented yet'))
             if _is_interleaved(p): # 1 if interleaved slices
-                # TODO this fix should not be here 
-                # TODO # think of something less shameful
-                if vj.util.disgustingworkaroundforpossiblebug(p) == False:
-                    if _is_evenslices(p):
-                        c = np.zeros(kspace.shape, dtype='complex64')
-                        c[...,0::2,:] = kspace[...,:slices//2,:]
-                        c[...,1::2,:] = kspace[...,slices//2:,:]
-                        kspace = c
-                    else:
-                        c = np.zeros(kspace.shape, dtype='complex64')
-                        c[...,0::2,:] = kspace[...,:(slices+1)//2,:]
-                        c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]
-                        kspace = c
+                if _is_evenslices(p):
+                    c = np.zeros(kspace.shape, dtype='complex64')
+                    c[...,0::2,:] = kspace[...,:slices//2,:]
+                    c[...,1::2,:] = kspace[...,slices//2:,:]
+                    kspace = c
                 else:
-                    pass
+                    c = np.zeros(kspace.shape, dtype='complex64')
+                    c[...,0::2,:] = kspace[...,:(slices+1)//2,:]
+                    c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]
+                    kspace = c
             self.kspace = kspace
-            #aff = vj.io.NiftiWriter(np.absolute(kspace[1,...]),self.procpar).aff
-            #ni = nib.viewers.OrthoSlicer3D(np.absolute(kspace[1,...]),affine = aff)
-            #ni.show()
             return kspace
 
         def make_im2Dcs():
