@@ -2,6 +2,10 @@ import vnmrjpy as vj
 import numpy as np
 from math import sin, cos
 
+def to_rat_brain_space(data,procpar):
+
+    pass
+
 def flip_sliceaxis(data,sliceaxis,sliceorder):            
     """Flip slice after transform to scanner space
 
@@ -49,6 +53,7 @@ def get_swap_array(orient):
         sliceaxis = 2
     elif orient == 'sag':
         arr = [2,0,1]
+        flipaxis = None
         sliceaxis = 0
     elif orient == 'sag90': 
         arr = [2,1,0]
@@ -146,10 +151,6 @@ def check_90deg(procpar):
         return True
     else:
         return False
-
-def to_rg_space(indata,procpar):
-    """Compatibility space"""
-    pass
 
 def to_scanner_space(indata, procpar):
     """Transform data to scanner coordinate space by properly swapping axes

@@ -98,8 +98,6 @@ class NiftiWriter():
                 raise(Exception('Not implemented yet'))
             # this is the standard
             if from_local==True and self.coordinate_system=='scanner':
-                print('niftiwriter HERE')
-                print(self.data.shape)
                 self.data = vj.util.to_scanner_space(self.data, self.procpar)
                 # check for X gradient reversion
                 #self.data = vj.util.corr_x_flip(self.data)

@@ -110,9 +110,8 @@ class Niview():
         if self.transform:
             try:
                 self.data = vj.util.to_scanner_space(self.data,self.procpar)
-                self.affine = np.eye(4)
             except:
-                raise
+                print('Passing transform to scanner...')
         self.data = np.flip(self.data,axis=1)
         # default to cubic affine, this should be close
         try:
