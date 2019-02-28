@@ -42,28 +42,16 @@ class NiftiWriter():
             header = nib.nifti1.Nifti1Header()
             matrix_orig, dim_orig = vj.util.make_local_matrix(self.ppdict)
             matrix = vj.util.swapdim(swaparr,matrix_orig)
-            
-            if self.ppdict['apptype'] in ['im3D','im3Dshim']:
-                header.set_data_shape(matrix)
-                header.set_xyzt_units(xyz='mm')
-                header.set_qform(aff, code='scanner')
 
-            elif self.ppdict['apptype'] in ['im2D','im2Dfse','im2Dcs']:
-                #header.set_xyzt_units(xyz='mm')
-                header.set_qform(self.affine, code=1)
-                #header['qform_code'] = 1
-        
-                header['xyzt_units'] = 2
-                header['dim'][0] = 4
-                header['dim'][1] = matrix[0]
-                header['dim'][2] = matrix[1]
-                header['dim'][3] = matrix[2]
-                header['dim'][4] = data.shape[-1]
-                header['intent_name'] = 'THEINTENT'
-                header['aux_file'] = 'THEAUXILIARYFILE'
-            else:
-                raise(Exception('not implemented'))
-    
+            header['xyzt_units'] = 2
+            header['dim'][0] = 4
+            header['dim'][1] = matrix[0]
+            header['dim'][2] = matrix[1]
+            header['dim'][3] = matrix[2]
+            header['dim'][4] = data.shape[-1]
+            header['intent_name'] = 'THEINTENT'
+            header['aux_file'] = 'THEAUXILIARYFILE'
+            header.set_qform(self.affine, code=1)
             return header
 
 

@@ -3,7 +3,9 @@ import numpy as np
 from math import sin, cos
 
 def to_rat_brain_space(data,procpar):
+    """First transform to scanner than to rat anatomical
 
+    """
     pass
 
 def get_swap_array(orient):

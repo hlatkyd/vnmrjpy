@@ -14,3 +14,4 @@ from .readpetable import *
 from .transform import *
 from .disgusting import *
 from .niftiutils import *
+from .fidutils import *

@@ -65,7 +65,8 @@ class KspaceMaker():
         self.pre_kspace = np.vectorize(complex)(fid_data[:,0::2],\
                                                 fid_data[:,1::2])
         self.pre_kspace = np.array(self.pre_kspace,dtype='complex64')
- 
+        # check for arrayed parameters, save the length for later 
+        self.array_length = vj.util.calc_array_length(self.fid_data.shape,procpar)
         if verbose:
             print('Making k-space for '+ str(apptype)+' '+str(self.p['seqfil'])+\
                 ' seqcon: '+str(self.p['seqcon']))
@@ -80,13 +81,6 @@ class KspaceMaker():
         Return: 
             kspace=numpy.ndarray([rcvrs,phase,readout,slice,echo/time])
         """
-        def _check_arrayed_params(ppdict):
-            """Look for vnmrj "arrayed" parameters, for setup
-
-            Might be: TR, TE, etc. Should be put into 'time' dimension
-            """
-            pass
-
         def _is_interleaved(ppdict):
             res  = (int(ppdict['sliceorder']) == 1)
             return res
@@ -99,8 +93,8 @@ class KspaceMaker():
         def make_im2D():
             """Child method of 'make', provides the same as vnmrj im2Drecon"""
     
-            kspace = self.pre_kspace
             p = self.p
+            rcvrs = int(p['rcvrs'].count('y'))
             (read, phase, slices) = (int(p['np'])//2, \
                                             int(p['nv']), \
                                             int(p['ns']))
@@ -111,46 +105,54 @@ class KspaceMaker():
                 echo = 1
 
             time = 1
-            
-            if p['seqcon'] == 'nccnn':
-                shape = (self.rcvrs, phase, slices, echo*time, read)
-                kspace = np.reshape(kspace, shape, order='C')
-                kspace = np.moveaxis(kspace, [0,1,4,2,3], self.dest_shape)
+            finalshape = (rcvrs, phase, read, slices,echo*time*self.array_length)
+            final_kspace = np.zeros(finalshape,dtype='complex64')
+           
+            for i in range(self.array_length):
+ 
+                kspace = self.pre_kspace[i*rcvrs:(i+1)*rcvrs,:]
 
-            elif p['seqcon'] == 'nscnn':
+                if p['seqcon'] == 'nccnn':
+                    shape = (self.rcvrs, phase, slices, echo*time, read)
+                    kspace = np.reshape(kspace, shape, order='C')
+                    kspace = np.moveaxis(kspace, [0,1,4,2,3], self.dest_shape)
 
-                raise(Exception('not implemented'))
+                elif p['seqcon'] == 'nscnn':
 
-            elif p['seqcon'] == 'ncsnn':
+                    raise(Exception('not implemented'))
 
-                preshape = (self.rcvrs, phase, slices*echo*time*read)
-                shape = (self.rcvrs, phase, slices, echo*time, read)
-                kspace = np.reshape(kspace, preshape, order='F')
-                kspace = np.reshape(kspace, shape, order='C')
-                kspace = np.moveaxis(kspace, [0,1,4,2,3], self.dest_shape)
+                elif p['seqcon'] == 'ncsnn':
 
-            elif p['seqcon'] == 'ccsnn':
+                    preshape = (self.rcvrs, phase, slices*echo*time*read)
+                    shape = (self.rcvrs, phase, slices, echo*time, read)
+                    kspace = np.reshape(kspace, preshape, order='F')
+                    kspace = np.reshape(kspace, shape, order='C')
+                    kspace = np.moveaxis(kspace, [0,1,4,2,3], self.dest_shape)
 
-                preshape = (self.rcvrs, phase, slices*echo*time*read)
-                shape = (self.rcvrs, phase, slices, echo*time, read)
-                kspace = np.reshape(kspace, preshape, order='F')
-                kspace = np.reshape(kspace, shape, order='C')
-                kspace = np.moveaxis(kspace, [0,1,4,2,3], self.dest_shape)
-            else:
-                raise(Exception('Not implemented yet'))
-            if _is_interleaved(p): # 1 if interleaved slices
-                if _is_evenslices(p):
-                    c = np.zeros(kspace.shape, dtype='complex64')
-                    c[...,0::2,:] = kspace[...,:slices//2,:]
-                    c[...,1::2,:] = kspace[...,slices//2:,:]
-                    kspace = c
+                elif p['seqcon'] == 'ccsnn':
+
+                    preshape = (self.rcvrs, phase, slices*echo*time*read)
+                    shape = (self.rcvrs, phase, slices, echo*time, read)
+                    kspace = np.reshape(kspace, preshape, order='F')
+                    kspace = np.reshape(kspace, shape, order='C')
+                    kspace = np.moveaxis(kspace, [0,1,4,2,3], self.dest_shape)
                 else:
-                    c = np.zeros(kspace.shape, dtype='complex64')
-                    c[...,0::2,:] = kspace[...,:(slices+1)//2,:]
-                    c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]
-                    kspace = c
-            self.kspace = kspace
-            return kspace
+                    raise(Exception('Not implemented yet'))
+                if _is_interleaved(p): # 1 if interleaved slices
+                    if _is_evenslices(p):
+                        c = np.zeros(kspace.shape, dtype='complex64')
+                        c[...,0::2,:] = kspace[...,:slices//2,:]
+                        c[...,1::2,:] = kspace[...,slices//2:,:]
+                        kspace = c
+                    else:
+                        c = np.zeros(kspace.shape, dtype='complex64')
+                        c[...,0::2,:] = kspace[...,:(slices+1)//2,:]
+                        c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]
+                        kspace = c
+
+                final_kspace[...,i*echo*time:(i+1)*echo*time] = kspace
+            self.kspace = final_kspace
+            return final_kspace
 
         def make_im2Dcs():
             """
@@ -162,6 +164,7 @@ class KspaceMaker():
                pass
  
             raise(Exception('not implemented'))
+
         def make_im2Depi():
 
             p = self.p

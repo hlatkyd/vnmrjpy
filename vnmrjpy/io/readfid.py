@@ -172,7 +172,7 @@ class FidReader():
         kspace = vj.recon.KspaceMaker(data, header, self.procpar).make()
         imgspace = vj.recon.ImageSpaceMaker(kspace, self.procpar).make()
         image = _ssos(imgspace)
-        #image = vj.util.to_scanner_space()
+        image = vj.util.to_scanner_space(image, self.procpar)
         #nwr = vj.io.NiftiWriter(image, self.procpar)
         affine = vj.util.make_scanner_affine(self.procpar)
         return image, affine
