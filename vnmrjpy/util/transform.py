@@ -6,29 +6,6 @@ def to_rat_brain_space(data,procpar):
 
     pass
 
-def flip_sliceaxis(data,sliceaxis,sliceorder):            
-    """Flip slice after transform to scanner space
-
-    """
-    # this is reversed now: actually flip if 'rev slices' is unchecked
-
-    # flip slice, so increasing order is up->down, left->right,s->n
-    if sliceorder < 2:  # this means 'rev order' is unchecked
-        if len(data.shape) < 5:
-            data = np.flip(data,axis=sliceaxis)
-        elif len(data.shape) == 5:
-            data = np.flip(data,axis=(sliceaxis+1))
-    return data
-
-def corr_x_flip(data):
-    """Check and correct X gradient polarity flip"""
-    if vj.config['swap_x_grad']:
-        if len(data.shape) < 5:
-            data = np.flip(data,axis=0)
-        elif len(data.shape) == 5:
-            data = np.flip(data,axis=1)
-    return data
-
 def get_swap_array(orient):
     """Gives how to reorder and flip the axes to fit scanner space
 
@@ -49,23 +26,24 @@ def get_swap_array(orient):
         sliceaxis = 2
     elif orient == 'trans90':
         arr = [1,0,2]
-        flipaxis = 1
+        flipaxis = [1]
         sliceaxis = 2
     elif orient == 'sag':
-        arr = [2,0,1]
+        arr = [1,2,0]
         flipaxis = None
         sliceaxis = 0
     elif orient == 'sag90': 
         arr = [2,1,0]
-        flipaxis = None
+        flipaxis = [2]
         sliceaxis = 0
     elif orient == 'cor':
         arr = [0,2,1]
-        flipaxis = 1
+        flipaxis = [1]
         sliceaxis = 1
     elif orient == 'cor90': 
         arr = [1,2,0]
-        flipaxis = None
+        arr = [2,0,1]
+        flipaxis = [1,2]
         sliceaxis = 1
     else:
         raise(Exception('Other orientations not implemented'))
@@ -105,12 +83,13 @@ def make_scanner_affine(procpar):
     p = vj.io.ProcparReader(procpar).read()
     orient = p['orient']
     # epip and other have different parameter names on phase and readout matrix
+    mul = 10
     if 'epip' not in p['pslabel']:
         phase = int(p['np'])//2
         read = int(p['nv'])
         # these are in cm!
-        lro = float(p['lro'])*10
-        lpe = float(p['lpe'])*10
+        lro = float(p['lro'])*mul
+        lpe = float(p['lpe'])*mul
         if '2D' in p['apptype']:
             slices = int(p['ns'])
             thk = float(p['thk'])
@@ -118,13 +97,11 @@ def make_scanner_affine(procpar):
             arr = [lpe/phase,lro/read,(thk+gap)]
         elif '3D' in p['apptype']:
             phase2 = int(p['nv2'])
-            lpe2 = float(p['lpe2'])*10
+            lpe2 = float(p['lpe2'])*mul
             arr = [lpe/phase,lro/read,lpe2/phase2]
         else:
             raise(Exception)
             
-    elif 'epip' in p['pslabel']:
-        pass
     else:
         raise(Exception)
 
@@ -134,25 +111,8 @@ def make_scanner_affine(procpar):
     affine = np.array(np.eye(4,dtype=float)*arr,dtype=float)
     return affine
     
-def check_90deg(procpar):
-    """Make sure all rotations are multiples of 90deg
 
-    Euler angles of rotations are psi, phi, theta,
-
-    Args:
-        procpar
-    Return:
-        True or False
-
-    """
-    p = vj.io.ProcparReader(procpar).read()
-    psi, phi, theta = int(p['psi']), int(p['phi']), int(p['theta'])
-    if psi % 90 == 0 and phi % 90 == 0 and theta % 90 == 0:
-        return True
-    else:
-        return False
-
-def to_scanner_space(indata, procpar):
+def to_scanner_space(indata, procpar, flip_gradients=True):
     """Transform data to scanner coordinate space by properly swapping axes
 
     Standard vnmrj orientation - meaning rotations are 0,0,0 - is axial, with
@@ -180,30 +140,54 @@ def to_scanner_space(indata, procpar):
 
         This was done to avoid thinking. Would benefit from rewriting.
         """
+
         orient = p['orient']
+        print(orient)
         sliceorder = int(p['sliceorder'])
         dims = len(data.shape)
         newarr, flipaxis, sliceaxis = get_swap_array(orient)  
+        print(newarr)
+        #flipping slices before axis transform
+        if '2D' in p['apptype'] or '2d' in p['apptype']:
+            # sliceorder can be 0,1,2,3 odd means interleaved,
+            # > 2 means reversed order
+            if int(p['sliceorder']) < 2:
+                data = flip_sliceaxis(data)         
+
+        # flipping gradients before axis transform
+        if flip_gradients==True:
+        
+            print('Flipping gradient axes')
+            data = flip_peaxis(data)
+            data = flip_roaxis(data)
+            if '3D' in p['apptype'] or '3d' in p['apptype']:
+                data = flip_pe2axis(data)
+        # moving around axes according to orient
         if dims == 3:
             data = np.moveaxis(data, [0,1,2], newarr)
         elif dims == 4:
             newarr = newarr+[3]
+            print(data.shape)
             data = np.moveaxis(data, [0,1,2,3], newarr)
+            #data = np.moveaxis(data, newarr,[0,1,2,3])
+            print(newarr)
+            print(data.shape)
         elif dims == 5:
             if flipaxis != None:
                 flipaxis = flipaxis+1
             newarr = [0]+newarr+[4]
             data = np.moveaxis(data, [0,1,2,3,4], newarr)
-
+        #flipping axes according to orient
         if flipaxis != None:
-            data = np.flip(data, axis=flipaxis) 
+            for i in flipaxis:
+                data = np.flip(data, axis=i) 
 
+        
         # correct in case X gradient is inverted
-        data = corr_x_flip(data)
+        #data = corr_x_flip(data)
         # correct reversed slice order
-        data = flip_sliceaxis(data,sliceaxis,sliceorder)         
         return data
-
+    #--------------------------------------------------------------------------
     #TODO this is for later, for more sophisticated uses perhaps
     def _calc_matrix(p):
         """calculate rotation matrix"""
@@ -219,7 +203,7 @@ def to_scanner_space(indata, procpar):
                     -sin(phi)*sin(psi)+cos(psi)*cos(theta)*cos(phi),\
                     -sin(theta)*cos(psi)],\
             [sin(theta)*sin(phi), sin(theta)*cos(phi), cos(theta)]]
-    #-------------------------------main--------------------------------
+    #-------------------------------main---------------------------------------
     if len(indata.shape) == 4 or len(indata.shape) == 5:
         pass
     else:
@@ -236,4 +220,87 @@ def to_scanner_space(indata, procpar):
     #TODO transform affine as well
     
 
+def check_90deg(procpar):
+    """Make sure all rotations are multiples of 90deg
 
+    Euler angles of rotations are psi, phi, theta,
+
+    Args:
+        procpar
+    Return:
+        True or False
+
+    """
+    p = vj.io.ProcparReader(procpar).read()
+    psi, phi, theta = int(p['psi']), int(p['phi']), int(p['theta'])
+    if psi % 90 == 0 and phi % 90 == 0 and theta % 90 == 0:
+        return True
+    else:
+        return False
+
+def flip_roaxis(data,axis='default'):
+
+    if axis=='default':
+        if len(data.shape) < 5:
+            ax = vj.config['ro_dim']-1
+        elif len(data.shape) == 5:
+            ax = vj.config['ro_dim']
+    else:
+        ax = axis
+    return np.flip(data,axis=ax)
+
+def flip_peaxis(data,axis='default'):
+
+    if axis=='default':
+        if len(data.shape) < 5:
+            ax = vj.config['pe_dim']-1
+        elif len(data.shape) == 5:
+            ax = vj.config['pe_dim']
+    else:
+        ax = axis
+    return np.flip(data,axis=ax)
+
+def flip_sliceaxis(data,axis='default'):
+        
+    if axis=='default':
+        if len(data.shape) < 5:
+            ax = vj.config['slc_dim']-1
+        elif len(data.shape) == 5:
+            ax = vj.config['slc_dim']
+    else:
+        ax = axis
+    return np.flip(data,axis=ax)
+        
+def flip_pe2axis(data,axis='default'):
+
+    if axis=='default':
+        if len(data.shape) < 5:
+            ax = vj.config['pe2_dim']-1
+        elif len(data.shape) == 5:
+            ax = vj.config['pe2_dim']
+    else:
+        ax = axis
+    return np.flip(data,axis=ax)
+
+def corr_sliceaxis(data,sliceaxis,sliceorder):            
+    """Flip slice after transform to scanner space
+
+    """
+    # this is reversed now: actually flip if 'rev slices' is unchecked
+
+    # flip slice, so increasing order is up->down, left->right,s->n
+    if sliceorder < 2:  # this means 'rev order' is unchecked
+        if len(data.shape) < 5:
+            data = np.flip(data,axis=sliceaxis)
+        elif len(data.shape) == 5:
+            data = np.flip(data,axis=(sliceaxis+1))
+    return data
+
+def corr_x_flip(data):
+    """Check and correct X gradient polarity flip"""
+    if vj.config['swap_x_grad']:
+        if len(data.shape) < 5:
+            data = np.flip(data,axis=0)
+        elif len(data.shape) == 5:
+            data = np.flip(data,axis=1)
+    return data

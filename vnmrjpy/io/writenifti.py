@@ -42,7 +42,6 @@ class NiftiWriter():
             header = nib.nifti1.Nifti1Header()
             matrix_orig, dim_orig = vj.util.make_local_matrix(self.ppdict)
             matrix = vj.util.swapdim(swaparr,matrix_orig)
-            print(matrix)
             
             if self.ppdict['apptype'] in ['im3D','im3Dshim']:
                 header.set_data_shape(matrix)
@@ -59,10 +58,9 @@ class NiftiWriter():
                 header['dim'][1] = matrix[0]
                 header['dim'][2] = matrix[1]
                 header['dim'][3] = matrix[2]
-                header['dim'][4] = 1
+                header['dim'][4] = data.shape[-1]
                 header['intent_name'] = 'THEINTENT'
                 header['aux_file'] = 'THEAUXILIARYFILE'
-                print(header['dim'])
             else:
                 raise(Exception('not implemented'))
     
@@ -98,9 +96,8 @@ class NiftiWriter():
                 raise(Exception('Not implemented yet'))
             # this is the standard
             if from_local==True and self.coordinate_system=='scanner':
+                print('NiftiWriter: transforming to scanner space from local')
                 self.data = vj.util.to_scanner_space(self.data, self.procpar)
-                # check for X gradient reversion
-                #self.data = vj.util.corr_x_flip(self.data)
                 self.affine = vj.util.make_scanner_affine(self.procpar)
                 self.header = _make_scanner_header()
             else:
@@ -122,11 +119,7 @@ class NiftiWriter():
             out_name = str(out[:-3])
         else:
             out_name = str(out)+'.nii'
-        print(self.data.shape)
         img = nib.Nifti1Image(self.data, self.affine, self.header)
-        print('final header')
-        print(img.header['dim'])
-        #img.update_header()
         nib.save(img,out_name)
         os.system('gzip -f '+str(out_name))
         if self.verbose:

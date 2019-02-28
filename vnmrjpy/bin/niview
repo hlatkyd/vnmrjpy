@@ -50,9 +50,6 @@ class Niview():
             self.procpar = procpar
             fid_data, fidhdr = vj.io.FidReader(fidfile, procpar).read()
             kspace = vj.recon.KspaceMaker(fid_data, fidhdr, procpar).make()
-            #kspace = vj.recon.KspaceCompleter(kspace, procpar).make()
-            nwr = vj.io.NiftiWriter(kspace[0,...], procpar)
-            self.affine = nwr.affine
             
             # show kspace
             if showkspace == True:
@@ -95,8 +92,16 @@ class Niview():
                     else:
                         raise(Exception('not implemented'))
 
-        else:
+            if self.transform:
+                try:
+                    print('Transforming to scanner space...')
+                    self.data = vj.util.to_scanner_space(self.data,self.procpar)
+                    self.affine = vj.util.make_scanner_affine(self.procpar)
+                except:
+                    print('Passing transform to scanner...')
 
+
+        else:
             print('Possibly wrong input. Quitting ...')
             return
         #finding dimension with 1 length
@@ -107,18 +112,14 @@ class Niview():
 
         dim 1 is flipped because natural y axis is up->down
         """
-        if self.transform:
-            try:
-                self.data = vj.util.to_scanner_space(self.data,self.procpar)
-            except:
-                print('Passing transform to scanner...')
-        self.data = np.flip(self.data,axis=1)
         # default to cubic affine, this should be close
         try:
-            affine = vj.util.make_scanner_affine(self.procpar)
+            affine = self.affine 
         except:
+            print('Backing to default cubic affine')
             affine = vj.util.make_cubic_affine(self.data)
         v = nib.viewers.OrthoSlicer3D(self.data, affine=affine)
+        print('Plotting...')
         v.show()
 
 if __name__ == '__main__':
