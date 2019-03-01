@@ -3,6 +3,7 @@ import numpy as np
 import time
 import os
 import matplotlib.pyplot as plt
+import nipype as nip
 
 class Composer():
     """Match the phases of different receiver channels
@@ -45,15 +46,20 @@ class Composer():
         if not os.path.exists(self.workdir):
             os.makedirs(self.workdir)
 
-        # testplot 
+        # testplot
+        """
         plt.subplot(1,2,1)
         plt.imshow(_ssos(self.imgspace)[:,:,13,0])
         plt.subplot(1,2,2)
         plt.imshow(_ssos(self.imgspace_ref)[:,:,18,0])
         plt.show()
-        writer = vj.io.NiftiWriter(_ssos(self.imgspace), self.procpar)
+        """
+        writer = vj.io.NiftiWriter(_ssos(self.imgspace), self.procpar,\
+                                    input_space='local',output_space='rat_anatomical')
         writer.write(self.workdir+'/composer_img_main')
-        writer = vj.io.NiftiWriter(_ssos(self.imgspace_ref), self.procpar_ref)
+        writer = vj.io.NiftiWriter(_ssos(self.imgspace_ref), self.procpar_ref,\
+                                    input_space='local',output_space='rat_anatomical')
         writer.write(self.workdir+'/composer_ref_main')
+
     def match_from_nifti():
         pass

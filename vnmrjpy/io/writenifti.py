@@ -90,7 +90,12 @@ class NiftiWriter():
                 self.affine = vj.util.make_scanner_affine(self.procpar)
                 self.header = _make_scanner_header()
             elif input_space=='local' and output_space=='rat_anatomical':
-                raise(Exception('Not implemented'))
+                print('NiftiWriter: transforming to scanner space from local')
+                self.data = vj.util.to_scanner_space(self.data, self.procpar)
+                print('NiftiWriter: transforming from scanner to rat anatomical space')
+                self.data = vj.util.scanner_to_rat_anatomical(self.data)
+                self.affine = vj.util.make_rat_anatomical_affine(self.procpar)
+                self.header = _make_scanner_header()
             elif input_space=='scanner' and output_space=='rat_anatomical':
                 print('NiftiWriter: transforming from scanner to rat anatomical space')
                 self.data = vj.util.scanner_to_rat_anatomical(self.data)

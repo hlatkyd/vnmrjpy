@@ -30,7 +30,11 @@ def calc_array_length(fid_data_shape,procpar):
     
     seqcon_dims = [ne,slc,pe,pe2,pe3]
     s_ind[s_pos] = 1
-    blocks_wo_array = rcvrs
+    blocks_wo_array = 0
     for i in range(5):
         blocks_wo_array+=seqcon_dims[i]*s_ind[i]
-    return blocks // blocks_wo_array
+    l = blocks // blocks_wo_array - rcvrs
+    if l != 0:
+        return l
+    else:
+        return 1

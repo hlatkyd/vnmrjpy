@@ -11,8 +11,6 @@ class Test_Composer(unittest.TestCase):
         mems = glob.glob(compdir+'/mems*')[0]
         procpar_ref = ref+'/procpar'
         procpar = mems+'/procpar'
-        print(ref)
-        print(mems)
         #make images
         (data_ref, hdr_ref) = vj.io.FidReader(ref).read()
         (data, hdr) = vj.io.FidReader(mems).read()

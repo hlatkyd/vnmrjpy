@@ -46,7 +46,6 @@ class KspaceMaker():
             return AP_dict
 
         self.p = vj.io.ProcparReader(procpar).read()
-        self.fid_data = fid_data
         self.fid_header = fidheader
         self.rcvrs = str(self.p['rcvrs']).count('y')
         self.arrayed_AP = _get_arrayed_AP(self.p)
@@ -66,7 +65,8 @@ class KspaceMaker():
                                                 fid_data[:,1::2])
         self.pre_kspace = np.array(self.pre_kspace,dtype='complex64')
         # check for arrayed parameters, save the length for later 
-        self.array_length = vj.util.calc_array_length(self.fid_data.shape,procpar)
+        self.array_length = vj.util.calc_array_length(fid_data.shape,procpar)
+        self.blocks = fid_data.shape[0] // self.array_length
         if verbose:
             print('Making k-space for '+ str(apptype)+' '+str(self.p['seqfil'])+\
                 ' seqcon: '+str(self.p['seqcon']))
@@ -110,7 +110,7 @@ class KspaceMaker():
            
             for i in range(self.array_length):
  
-                kspace = self.pre_kspace[i*rcvrs:(i+1)*rcvrs,:]
+                kspace = self.pre_kspace[i*self.blocks:(i+1)*self.blocks,...]
 
                 if p['seqcon'] == 'nccnn':
                     shape = (self.rcvrs, phase, slices, echo*time, read)
