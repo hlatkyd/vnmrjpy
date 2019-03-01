@@ -2,55 +2,6 @@ import vnmrjpy as vj
 import numpy as np
 from math import sin, cos
 
-def to_rat_brain_space(data,procpar):
-    """First transform to scanner than to rat anatomical
-
-    """
-    pass
-
-def get_swap_array(orient):
-    """Gives how to reorder and flip the axes to fit scanner space
-
-    [phase, readout, slice] -> [x,y,z]
-    
-    Used with np.moveaxes
-
-    Args:
-        orient -- procpar parameter 'orient'
-    Returns:
-        arr -- sequence of new axes
-        flipaxis -- axis to flip
-        sliceaxis -- axis of slice encoding
-    """
-    if orient == 'trans':
-        arr = [0,1,2]
-        flipaxis = None
-        sliceaxis = 2
-    elif orient == 'trans90':
-        arr = [1,0,2]
-        flipaxis = [1]
-        sliceaxis = 2
-    elif orient == 'sag':
-        arr = [1,2,0]
-        flipaxis = None
-        sliceaxis = 0
-    elif orient == 'sag90': 
-        arr = [2,1,0]
-        flipaxis = [2]
-        sliceaxis = 0
-    elif orient == 'cor':
-        arr = [0,2,1]
-        flipaxis = [1]
-        sliceaxis = 1
-    elif orient == 'cor90': 
-        arr = [1,2,0]
-        arr = [2,0,1]
-        flipaxis = [1,2]
-        sliceaxis = 1
-    else:
-        raise(Exception('Other orientations not implemented'))
-
-    return arr, flipaxis, sliceaxis
 
 def make_cubic_affine(data):
     """Make Nifti affine assuming imaging volume is a cube
@@ -69,8 +20,37 @@ def make_cubic_affine(data):
     affine = np.eye(4)*dim_arr
     return affine
 
+def make_rat_anatomical_affine(procpar):
+    """Make rat_anatomical affine for Nifti header.
+
+    Almost the same as make_scanner_affine
+
+    Args:
+        data (np.ndarra) -- input data, 4D or 5D
+        procpar 
+    Return:
+        affine (np.ndarray) -- 4x4 diagonal matrix
+    """
+
+    p = vj.io.ProcparReader(procpar).read()
+    #arr =  dimensions of (phase, read, slice/phase2)
+    arr = vj.util.get_local_pixdim(p)
+    # params to transform to scanner from local
+    swaparr, flipaxis, sliceaxis = get_swap_array(p['orient'])
+    sortedarr = sorted(zip(swaparr,arr))
+    arr = [sortedarr[i][1] for i in range(3)]
+    # params to trnasform from scanner to rat_anat
+    
+    swaparr2rat = [0,2,1] 
+    sortedarr2 = sorted(zip(swaparr2rat,arr))
+    arr = [sortedarr2[i][1] for i in range(3)]
+    arr = arr + [1]
+    #TODO make translations
+    affine = np.array(np.eye(4,dtype=float)*arr,dtype=float)
+    return affine
+
 def make_scanner_affine(procpar):
-    """Make appropriate global affine for Nifti header.
+    """Make appropriate scanner affine for Nifti header.
 
     This is needed for viewing and saving nifti in scanner space
     Prabably safer to do it from scratch than transforming...
@@ -84,35 +64,30 @@ def make_scanner_affine(procpar):
     """
     p = vj.io.ProcparReader(procpar).read()
     orient = p['orient']
-    # epip and other have different parameter names on phase and readout matrix
-    mul = 10
-    if 'epip' not in p['pslabel']:
-        phase = int(p['np'])//2
-        read = int(p['nv'])
-        # these are in cm!
-        lro = float(p['lro'])*mul
-        lpe = float(p['lpe'])*mul
-        if '2D' in p['apptype']:
-            slices = int(p['ns'])
-            thk = float(p['thk'])
-            gap = float(p['gap'])
-            arr = [lpe/phase,lro/read,(thk+gap)]
-        elif '3D' in p['apptype']:
-            phase2 = int(p['nv2'])
-            lpe2 = float(p['lpe2'])*mul
-            arr = [lpe/phase,lro/read,lpe2/phase2]
-        else:
-            raise(Exception)
-            
-    else:
-        raise(Exception)
-
+    arr = get_local_pixdim(p)        
     swaparr, flipaxis, sliceaxis = get_swap_array(p['orient'])
     sortedarr = sorted(zip(swaparr,arr))
     arr = [sortedarr[i][1] for i in range(3)]+[1.0]
+    #TODO make translations
     affine = np.array(np.eye(4,dtype=float)*arr,dtype=float)
     return affine
     
+def scanner_to_rat_anatomical(data):
+    """Transform from scanner to rat anatomical
+
+    """
+    datadims = len(data.shape)
+    olddims = [0,1,2]  # scanner [x,y,z]
+    newdims = [0,2,1]
+    if datadims == 4:
+        olddims = olddims+[3]
+        newdims = newdims+[3]
+    if datadims == 5:
+        olddims = [0,1,2,3,4]
+        newdims = [0,1,3,2,4]
+        # change axis
+    data = np.moveaxis(data,olddims, newdims)
+    return data
 
 def to_scanner_space(indata, procpar, flip_gradients=True):
     """Transform data to scanner coordinate space by properly swapping axes
@@ -144,11 +119,9 @@ def to_scanner_space(indata, procpar, flip_gradients=True):
         """
 
         orient = p['orient']
-        print(orient)
         sliceorder = int(p['sliceorder'])
         dims = len(data.shape)
         newarr, flipaxis, sliceaxis = get_swap_array(orient)  
-        print(newarr)
         #flipping slices before axis transform
         if '2D' in p['apptype'] or '2d' in p['apptype']:
             # sliceorder can be 0,1,2,3 odd means interleaved,
@@ -169,11 +142,8 @@ def to_scanner_space(indata, procpar, flip_gradients=True):
             data = np.moveaxis(data, [0,1,2], newarr)
         elif dims == 4:
             newarr = newarr+[3]
-            print(data.shape)
             data = np.moveaxis(data, [0,1,2,3], newarr)
             #data = np.moveaxis(data, newarr,[0,1,2,3])
-            print(newarr)
-            print(data.shape)
         elif dims == 5:
             if flipaxis != None:
                 flipaxis = flipaxis+1
@@ -306,3 +276,78 @@ def corr_x_flip(data):
         elif len(data.shape) == 5:
             data = np.flip(data,axis=1)
     return data
+
+def get_swap_array(orient):
+    """Gives how to reorder and flip the axes to fit scanner space
+
+    [phase, readout, slice] -> [x,y,z]
+    
+    Used with np.moveaxes
+
+    Args:
+        orient -- procpar parameter 'orient'
+    Returns:
+        arr -- sequence of new axes
+        flipaxis -- axis to flip
+        sliceaxis -- axis of slice encoding
+    """
+    if orient == 'trans':
+        arr = [0,1,2]
+        flipaxis = None
+        sliceaxis = 2
+    elif orient == 'trans90':
+        arr = [1,0,2]
+        flipaxis = [1]
+        sliceaxis = 2
+    elif orient == 'sag':
+        arr = [1,2,0]
+        flipaxis = None
+        sliceaxis = 0
+    elif orient == 'sag90': 
+        arr = [2,1,0]
+        flipaxis = [2]
+        sliceaxis = 0
+    elif orient == 'cor':
+        arr = [0,2,1]
+        flipaxis = [1]
+        sliceaxis = 1
+    elif orient == 'cor90': 
+        arr = [1,2,0]
+        arr = [2,0,1]
+        flipaxis = [1,2]
+        sliceaxis = 1
+    else:
+        raise(Exception('Other orientations not implemented'))
+
+    return arr, flipaxis, sliceaxis
+
+def get_local_pixdim(p):
+    """Calculate pixel dimension in (pe,ro,slc)
+
+    Args:
+        p -- procpar ditionary
+    Returns:
+        arr -- 1x3 array of dimensions
+    """
+    mul = 10
+    if 'epip' not in p['pslabel']:
+        phase = int(p['np'])//2
+        read = int(p['nv'])
+        # these are in cm!
+        lro = float(p['lro'])*mul
+        lpe = float(p['lpe'])*mul
+        if '2D' in p['apptype']:
+            slices = int(p['ns'])
+            thk = float(p['thk'])
+            gap = float(p['gap'])
+            arr = [lpe/phase,lro/read,(thk+gap)]
+        elif '3D' in p['apptype']:
+            phase2 = int(p['nv2'])
+            lpe2 = float(p['lpe2'])*mul
+            arr = [lpe/phase,lro/read,lpe2/phase2]
+        else:
+            raise(Exception)
+    else:
+        raise(Exception)
+
+    return arr

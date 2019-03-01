@@ -1,1 +1,25 @@
-data layout: numpy.ndarray(coil, phase, readout, slice, echo)
+1.
+===============================================================================
+Default data layout at kspace construction:
+    numpy.ndarray(coil, phase, readout, slice, echo)
+2.
+===============================================================================
+Coordinate systems used in NiftiWriter, NiftiReader, and other higher-level
+processing functions which work with nifti files or call FSL. (TODO: list)
+
+'local' space: (phase, readout, slice/phase2)
+
+'scanner' space : (x,y,z)
+    x -- horizontal left-to-right
+    y -- vertical down-up
+    z -- axial near-far
+
+'rat_anatomical' space (x,y,z)
+
+
+'global' space (x,y,z)
+
+    TODO
+    Intention:
+    Handling oblique slices in post processing by simply transforming to
+    'scanner'/'rat_anatomical' space and zerofilling unacquired data in FOV 

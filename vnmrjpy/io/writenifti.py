@@ -23,8 +23,8 @@ class NiftiWriter():
 
     """
     def __init__(self, data, procpar, verbose=False,\
-                                    to_scanner=None,\
-                                    from_local=True,\
+                                    output_space='default',\
+                                    input_space='local',\
                                     niftiheader=None):
         """Makes affine, and nifti header"""
 
@@ -75,21 +75,30 @@ class NiftiWriter():
         
         # which coordinate system to write?
         if niftiheader==None:
-            if to_scanner==None:
-            #default to config file
-                self.coordinate_system = vj.config['default_space']
-            elif to_scanner==True:
-                self.coordinate_system = 'scanner'
-            else:
-                raise(Exception('Not implemented yet'))
+
+            if output_space=='default':
+                #default to config file
+                output_space = vj.config['default_space']
             # this is the standard
-            if from_local==True and self.coordinate_system=='scanner':
+            if input_space=='local' and output_space=='scanner':
                 print('NiftiWriter: transforming to scanner space from local')
                 self.data = vj.util.to_scanner_space(self.data, self.procpar)
                 self.affine = vj.util.make_scanner_affine(self.procpar)
                 self.header = _make_scanner_header()
+            elif input_space=='scanner' and output_space=='scanner':
+                print('NiftiWriter: keeping data in scanner space')
+                self.affine = vj.util.make_scanner_affine(self.procpar)
+                self.header = _make_scanner_header()
+            elif input_space=='local' and output_space=='rat_anatomical':
+                raise(Exception('Not implemented'))
+            elif input_space=='scanner' and output_space=='rat_anatomical':
+                print('NiftiWriter: transforming from scanner to rat anatomical space')
+                self.data = vj.util.scanner_to_rat_anatomical(self.data)
+                self.affine = vj.util.make_rat_anatomical_affine(self.procpar)
+                self.header = _make_scanner_header()
+                
             else:
-                raise(Exception('not implemented'))
+                raise(Exception('Not implemented'))
         else:
             self.header = niftiheader
             self.affine = niftiheader.affine

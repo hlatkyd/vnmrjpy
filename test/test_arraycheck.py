@@ -19,7 +19,7 @@ class Test_array_param(unittest.TestCase):
 
     def test_array_gems_kmake(self):
 
-        fid_dir = glob.glob(vj.config['dataset_dir']+'/arrayed/*array_te*')[0]
+        fid_dir = glob.glob(vj.config['dataset_dir']+'/arrayed/*array_flip1*')[0]
         procpar = fid_dir+'/procpar'
         fid = fid_dir+'/fid'
         image, affine = vj.io.FidReader(fid,procpar).make_image()
