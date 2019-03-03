@@ -29,7 +29,7 @@ class KspaceMaker():
                             ([rcvrs, phase, read, slice, echo*time])
 
     """
-    def __init__(self, fid_data, fidheader, procpar, verbose=True):
+    def __init__(self, fid_data, fidheader, procpar, verbose=False):
         """Reads procpar"""
 
         def _get_arrayed_AP(p):

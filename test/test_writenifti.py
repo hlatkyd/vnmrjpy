@@ -56,3 +56,18 @@ class Test_niftiwriter(unittest.TestCase):
         writer = vj.io.NiftiWriter(image,procpar,\
                     input_space='scanner',output_space='rat_anatomical')
         writer.write(fullout)
+
+
+    def test_7dnifti(self):
+
+        mems_dir = glob.glob(vj.config['fids_dir']+'/mems*')[0]
+        procpar = mems_dir+'/procpar'
+        fid = mems_dir+'/fid'
+        fid_data, fid_header = vj.io.FidReader(fid,procpar).read()
+        kspace = vj.recon.KspaceMaker(fid_data,fid_header,procpar).make()
+        imgspace = vj.recon.ImageSpaceMaker(kspace, procpar).make()
+        img6d = vj.util.make_6d(imgspace,output_type='real-imag')
+        writer = vj.io.NiftiWriter(img6d,procpar,input_space='local',\
+                                    output_space='local')
+        out6d = vj.config['testresults_dir']+'/niftiwriter/nifti6d'
+        writer.write(out6d)

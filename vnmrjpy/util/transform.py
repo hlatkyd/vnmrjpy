@@ -86,8 +86,25 @@ def scanner_to_rat_anatomical(data):
         olddims = [0,1,2,3,4]
         newdims = [0,1,3,2,4]
         # change axis
+    if datadims == 6:  # [x,y,z,time,rcvrs,etc]
+        olddims = [0,1,2,3,4,5]
+        newdims = [0,2,1,3,4,5]
     data = np.moveaxis(data,olddims, newdims)
     return data
+
+def to_rat_anatomical_space(indata, procpar, flip_gradients=True):
+    """Transform data to rat_anatomical coordinates, similar to scanner space.
+
+    Args:
+        indata
+        procpar
+        flip_gradients
+    Return:
+        data -- data with swapped axes
+
+    """
+    data = to_scanner_space(indata,procpar,flip_gradients)
+    return scanner_to_rat_anatomical(data)
 
 def to_scanner_space(indata, procpar, flip_gradients=True):
     """Transform data to scanner coordinate space by properly swapping axes
@@ -132,7 +149,6 @@ def to_scanner_space(indata, procpar, flip_gradients=True):
         # flipping gradients before axis transform
         if flip_gradients==True:
         
-            print('Flipping gradient axes')
             data = flip_peaxis(data)
             data = flip_roaxis(data)
             if '3D' in p['apptype'] or '3d' in p['apptype']:
@@ -146,9 +162,16 @@ def to_scanner_space(indata, procpar, flip_gradients=True):
             #data = np.moveaxis(data, newarr,[0,1,2,3])
         elif dims == 5:
             if flipaxis != None:
-                flipaxis = flipaxis+1
+                flipaxis = np.array(flipaxis)+1
+            newarr = [i+1 for i in newarr]
             newarr = [0]+newarr+[4]
             data = np.moveaxis(data, [0,1,2,3,4], newarr)
+        elif dims == 6:
+            if flipaxis != None:
+                flipaxis = flipaxis
+            newarr = newarr+[3,4,5]
+            print(newarr)
+            data = np.moveaxis(data, [0,1,2,3,4,5], newarr)
         #flipping axes according to orient
         if flipaxis != None:
             for i in flipaxis:
@@ -176,7 +199,7 @@ def to_scanner_space(indata, procpar, flip_gradients=True):
                     -sin(theta)*cos(psi)],\
             [sin(theta)*sin(phi), sin(theta)*cos(phi), cos(theta)]]
     #-------------------------------main---------------------------------------
-    if len(indata.shape) == 4 or len(indata.shape) == 5:
+    if len(indata.shape) in [3,4,5,6]:
         pass
     else:
         raise(Exception('Only 3d, 4d or 5d data allowed'))
@@ -217,6 +240,8 @@ def flip_roaxis(data,axis='default'):
             ax = vj.config['ro_dim']-1
         elif len(data.shape) == 5:
             ax = vj.config['ro_dim']
+        elif len(data.shape) > 5:
+            ax = vj.config['ro_dim']-1
     else:
         ax = axis
     return np.flip(data,axis=ax)
@@ -228,6 +253,8 @@ def flip_peaxis(data,axis='default'):
             ax = vj.config['pe_dim']-1
         elif len(data.shape) == 5:
             ax = vj.config['pe_dim']
+        elif len(data.shape) > 5:
+            ax = vj.config['pe_dim']-1
     else:
         ax = axis
     return np.flip(data,axis=ax)
@@ -239,6 +266,8 @@ def flip_sliceaxis(data,axis='default'):
             ax = vj.config['slc_dim']-1
         elif len(data.shape) == 5:
             ax = vj.config['slc_dim']
+        elif len(data.shape) > 5:
+            ax = vj.config['slc_dim']-1
     else:
         ax = axis
     return np.flip(data,axis=ax)
@@ -250,6 +279,8 @@ def flip_pe2axis(data,axis='default'):
             ax = vj.config['pe2_dim']-1
         elif len(data.shape) == 5:
             ax = vj.config['pe2_dim']
+        elif len(data.shape) > 5:
+            ax = vj.config['pe2_dim']-1
     else:
         ax = axis
     return np.flip(data,axis=ax)
@@ -266,6 +297,8 @@ def corr_sliceaxis(data,sliceaxis,sliceorder):
             data = np.flip(data,axis=sliceaxis)
         elif len(data.shape) == 5:
             data = np.flip(data,axis=(sliceaxis+1))
+        elif len(data.shape) > 5:
+            data = np.flip(data,axis=sliceaxis)
     return data
 
 def corr_x_flip(data):
@@ -275,6 +308,8 @@ def corr_x_flip(data):
             data = np.flip(data,axis=0)
         elif len(data.shape) == 5:
             data = np.flip(data,axis=1)
+        elif len(data.shape) > 5:
+            data = np.flip(data,axis=0)
     return data
 
 def get_swap_array(orient):

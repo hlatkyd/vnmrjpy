@@ -8,7 +8,7 @@ class Test_Composer(unittest.TestCase):
 
         compdir = vj.config['dataset_dir']+'/parameterfit/composer'
         ref = glob.glob(compdir+'/*composer08_01.fid')[0]
-        mems = glob.glob(compdir+'/mems*')[0]
+        mems = glob.glob(compdir+'/mems_s_2019022301_01*')[0]
         procpar_ref = ref+'/procpar'
         procpar = mems+'/procpar'
         #make images
@@ -18,7 +18,10 @@ class Test_Composer(unittest.TestCase):
         kspace = vj.recon.KspaceMaker(data, hdr, procpar).make()
         imgspace = vj.recon.ImageSpaceMaker(kspace, procpar).make()
         imgspace_ref = vj.recon.ImageSpaceMaker(kspace_ref, procpar_ref).make()
+
+        #imgspace = vj.util.to_scanner_space(imgspace,procpar)
+        #imgspace_ref = vj.util.to_scanner_space(imgspace_ref,procpar_ref)
         
         comp = vj.recon.Composer(imgspace, imgspace_ref, procpar, procpar_ref)
-        comp.match()
+        comp.flirt_registration()
         

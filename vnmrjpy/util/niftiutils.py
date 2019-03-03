@@ -2,6 +2,36 @@ import vnmrjpy as vj
 import nibabel as nib
 import numpy as np
 
+def make_6d(data5d, output_type='magn-phase',input_rcvrdim=5):
+    """Return 6D data from complex 5D
+
+    Input should be the usual output of KspaceMaker of ImageSpaceMaker,
+    with the forat [receivers, x, y, z, time].
+    Return data in [x,y,z,t,receiver,magnitude/phase] format or
+    real-imaginynary
+
+    Args:
+        data5d (np.ndarray) -- input 5d data
+        output_type (string) -- either 'magn-phase' or 'real-imag'
+    Return:
+        data6d
+    """
+    olddims = [0,1,2,3,4]
+    newdims = [1,2,3,4,0]
+    if input_rcvrdim == 0:
+        data5d = np.moveaxis(data5d,newdims,olddims)
+    if output_type == 'magn-phase':
+        magn = np.absolute(data5d)
+        phase = np.arctan2(np.imag(data5d),np.real(data5d))
+        data6d = np.concatenate([magn[...,np.newaxis],phase[...,np.newaxis]],axis=-1)
+    elif output_type == 'real-imag':
+        real = np.real(data5d)
+        imag = np.imag(data5d)
+        data6d = np.concatenate([real[...,np.newaxis],imag[...,np.newaxis]],axis=-1)
+    else:
+        raise(Exception('Wrong "output_type" spec'))
+    return data6d
+
 def make_local_matrix(p):
     """Make matrix for nifit header based on procpar dict p
 
