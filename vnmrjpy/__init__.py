@@ -5,7 +5,16 @@ Vnmrjpy
 """
 import sys
 import os
+import warnings
 
+# import core functionality
+
+from . import core
+from .core import *
+# setting global constants not accessible at config
+DTYPE='complex64'
+
+# import submodules
 from . import aloha
 from . import recon
 from . import io
@@ -13,14 +22,6 @@ from . import util
 from . import fit
 
 # declare for easy testing
-
-dataset = '/home/david/dev/vnmrjpy/dataset'
-fids = dataset+'/fids'
-fdfs = dataset+'/fdfs'
-niftis = dataset+'/niftis'
-cs = dataset+'/cs'
-pics = dataset+'/testpics'
-
 
 # Read config file
 config = util.ConfigParser().parse()

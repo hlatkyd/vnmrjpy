@@ -1,0 +1,50 @@
+\documentclass[a4paper]{article}
+
+\begin{document}
+\title{Vnmrjpy Documentation}
+\maketitle
+
+\section{Introduction}
+\section{The varray object}
+\paragraph{
+This is the main class of the module. At the core it is a multidimensional
+numpy.ndarray containing the MRI data. Additional attributes control the
+tranformation and general process management of the data. 
+}
+\subsection{attributes}
+
+\begin{itemize}
+\item varary.data
+\item varray.pd
+\item varray.dims
+\item varray.sdims
+\item varray.dtype
+\item varray.space
+\item varray.source
+\item varray.intent
+\item varray.pipeline
+\item \texttt{varray.fid\_header}
+\item \texttt{varray.fdf\_header}
+\item \texttt{varray.nifti\_header}
+
+\end{itemize}
+
+\subsection{methods}
+\begin{itemize}
+
+\item \texttt{varray.to\_kspace()}
+\item \texttt{varray.to\_kspace()}
+\item \texttt{varray.to\_kspace()}
+
+\end{itemize}
+
+\section{Functions}
+
+\begin{itemize}
+\item \texttt{read\_fid()}
+\item \texttt{read\_fdf()}
+\item \texttt{read\_nifti()}
+
+\end{itemize}
+
+\end{document}

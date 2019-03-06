@@ -1,0 +1,13 @@
+2019.03.06.
+
+Another revamp started. Purpuse is to conatain data and all associated
+parameters in one class, and make more straighforward methods.
+
+Old classes should be replaced by functions (mostly at least)
+Deletions are not made at this point.
+
+Core submodule should contain most basic io and recon things
+New tests include:
+
+test_core.py
+test_core_write.py
