@@ -21,7 +21,7 @@ def write_nifti(varray,out, save_procpar=True, save_complex=False):
     # check type of data
     if varray.data.shape < 3:
         raise(Exception('Data dimension error'))
-    if is not varray.is_kspace_complete:
+    if not varray.is_kspace_complete:
         raise(Exception('K-space is not completed'))
 
 

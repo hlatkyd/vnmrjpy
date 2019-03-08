@@ -50,7 +50,10 @@ class ConfigParser():
                             try:
                                 item = int(item)
                             except:
-                                item = float(item)
+                                try:
+                                    item = float(item)
+                                except:
+                                    item = str(item)
                             val_list.append(item)
                         val = val_list
                     # check if integer

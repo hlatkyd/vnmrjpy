@@ -6,3 +6,10 @@ def vprint(string):
         print(string)
     else:
         pass
+
+
+def getpetab(pd):
+
+    pass 
+
+

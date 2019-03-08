@@ -3,6 +3,8 @@ import vnmrjpy as vj
 import glob
 import numpy as np
 
+vj.config['verbose']=False
+
 class Test_Core(unittest.TestCase):
 
     def test_core_basic(self):
@@ -11,6 +13,16 @@ class Test_Core(unittest.TestCase):
         data = np.random.rand(*shape)
         varr = vj.varray(data=data)
         self.assertEqual(varr.data.shape,shape)
+
+    def test_core_arrayed_procpar(self):
+
+        gems_arr_te = glob.glob(vj.config['dataset_dir']+'/arrayed/'+\
+                            'gems_*array_te*')[0]
+        procpar = gems_arr_te+'/procpar'
+        pd = vj.read_procpar(procpar)
+        varray = vj.read_fid(gems_arr_te)
+        #self.assertEqual(varray.arrayed_params)
+
 
     def test_read_fid(self):
 

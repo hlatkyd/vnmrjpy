@@ -13,6 +13,7 @@ from vnmrjpy.core.utils import vprint
 import numpy as np
 import os
 import glob
+import csv
 
 def read_procpar(procpar):
     """Return dictionary of varian parameters from procpar file"""
@@ -217,10 +218,10 @@ def read_fid(fid,procpar=None):
         fid_data[k,:] = np.frombuffer(bytearray(block_data),dt)
 
     # fid data ready, now create varray class
-    arr = _get_arrayed_params(pd)
+    arr = _get_arrayed_par_length(pd)
     return  vj.varray(data=fid_data,space='fid',pd=pd,fid_header=header_dict,\
                         source='fid',dtype=vj.DTYPE, seqcon=pd['seqcon'],\
-                        apptype=pd['apptype'],arrayed_params=arr)
+                        apptype=pd['apptype'],arrayed_params=arr,vdtype='fid')
 
 def read_fdf(path):
     """Return vnmrjpy.varray from varian .fdf files
@@ -390,12 +391,69 @@ def read_fdf(path):
         raise(Exception('Not implemented'))
      
     # making vnmrjpy.varray
-    arrayed_params = _get_arrayed_params(pd) 
+    arrayed_params = _get_arrayed_par_length(pd) 
     return vj.varray(data=data_array, fdf_header=header_dict, pd=pd,\
                     dtype=vj.DTYPE, source='fdf', seqcon=pd['seqcon'],\
-                    apptype=pd['apptype'],arrayed_params=arrayed_params)
+                    apptype=pd['apptype'],arrayed_params=arrayed_params,\
+                    vdtype='image')
 
 
-def _get_arrayed_params(pd):
-    """Return tuple of (name, length) of arrayed acquisition parameters"""
-    return None
+def _get_arrayed_par_length(pd):
+    """Return tuple of (name, length) of arrayed acquisition parameters
+
+    List of possible arrayed parameters should be updated in config
+    """
+    pars = vj.config['array_pars']
+    lengths = []
+    for par in pars:
+        if type(pd[par]) == list:
+            l = len(pd[par])
+        else:
+            l = 1
+        lengths.append(l)
+    arrayed_pars = [(pars[i],lengths[i]) for i in range(len(pars))]
+    return arrayed_pars
+
+def read_petab(ppdict):
+    """Get and parse phase encode table for sequence
+
+    Args:
+        ppdict -- procpar dictionary
+
+    Return:
+        petab (np.ndarray)
+    """
+    def _readpetabfile(petabfile):
+        """Parses petab file contents into appropriate array"""
+        lst = []
+        lst_fin = []
+        if os.path.exists(petabfile):
+            pass
+        else:
+            raise(Exception('Could not find petab file'))
+        with open(petabfile, 'r') as openfile:
+            reader = csv.reader(openfile,delimiter='\t')
+            for item in reader:
+                lst.append(item)
+            # removing 't1 ='
+            lst = lst[1:]
+            for item in lst:
+                item_fin = []
+                for element in item[:-1]:  # the last one is whitespace
+                    element = int(element.replace(" ",""))
+                    item_fin.append(element)
+                lst_fin.append(item_fin)
+
+        petab = np.array(lst_fin)
+        return petab
+
+    try:
+        petabfile_name = ppdict['petable']
+    except:
+        return None
+    try:
+        fullpath = vj.config['tablib_dir']+'/'+petabfile_name
+        # TODO check file name consistency
+        return _readpetabfile(fullpath)
+    except:
+        raise(Exception('could not find petab file'))
