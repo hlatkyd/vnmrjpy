@@ -8,8 +8,29 @@ appropriate method of a varray object. More documentation is present at
 vnmrjpy/core/varray.py
 """
 def _to_scanner(varr):
+    """Transform data to scanner coordinate space by properly swapping axes
 
-    pass
+    Standard vnmrj orientation - meaning rotations are 0,0,0 - is axial, with
+    x,y,z axes (as global gradient axes) corresponding to phase, readout, slice.
+    vnmrjpy defaults to handling numpy arrays of:
+                (receivers, phase, readout, slice/phase2, time*echo)
+    but arrays of
+                        (receivers, x,y,z, time*echo)
+    is also desirable in some cases (for example registration in FSL flirt)
+
+    Euler angles of rotations are psi, phi, theta,
+
+    Also corrects reversed X gradient and sliceorder
+
+    Args:
+        data (3,4, or 5D np ndarray) -- input data to transform
+        procpar (path/to/file) -- Varian procpar file of data
+
+    Return:
+        swapped_data (np.ndarray)
+    """
+
+    
 
 def _to_anatomical(varr):
 

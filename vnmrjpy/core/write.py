@@ -1,31 +1,44 @@
 import vnmrjpy as vj
+from vnmrjpy.core.utils import vprint
 import numpy as np
 import nibabel as nib
 import glob
+from shutil import copyfile
+import warnings
+import os
 
-def write_procapr(pd, out):
-    """Write procpar file from procpar dictionary"""
-    pass
 def write_fdf(varray, out):
     """Write fdf files from varray data into .img direcotory specified in out"""
     pass
 
-def write_nifti(varray,out, save_procpar=True, save_complex=False):
+def write_nifti(varr,out, save_procpar=True,\
+                        save_complex=False,\
+                        rcvr_to_timedim=False,\
+                        complex_pairs='magn-phase',\
+                        combine_rcvrs='ssos'):
     """Write Nifti1 files from vnmrjpy.varray.
-   
+  
+    You can specify the data to be saved 
+ 
     Args:
         varray       -- vnmrjpy.varray object containing the data
         out          -- output path
-        save_procpar -- (boolean) saves hidden procpar in the same directory
+        save_procpar -- (boolean) saves procpar json in the same directory
+        save_complex -- save complex data in real-imag pairs along a dimension
+        only4dim     -- compress data into 4 dimensions , if possible
+        
     """
+    # sanity check for input options
+
+    if combine_rcvrs !=None and save_complex == True:
+        #TODO
+        pass
+
     # check type of data
-    if varray.data.shape < 3:
+    if len(varr.data.shape) < 3:
         raise(Exception('Data dimension error'))
-    if not varray.is_kspace_complete:
+    if not varr.is_kspace_complete:
         raise(Exception('K-space is not completed'))
-
-
-
     #------------------ making the Nifti affine and header-----------------
 
     # main write
@@ -35,31 +48,54 @@ def write_nifti(varray,out, save_procpar=True, save_complex=False):
         out_name = str(out[:-3])
     else:
         out_name = str(out)+'.nii'
-    header = _make_nifti_header(varray)
-    affine = _make_nifti_affine(varray)
+  
+    data = varr.data 
+    
+    # OPTION : save_complex----------------------------------------------------
 
-    data = varray.data
+    # to save complex data, real and imaginary parts are added
+    # to receiver channel
+    if save_complex:
+        rch = 4
 
-    img = nib.Nifti1Image(data, affine, header)
+        if complex_pairs =='real-imag':
+            data = np.concatenate([np.real(data), np.imag(data)],axis=rch)
+        elif complex_pairs == 'magn-phase':
+            magn = np.absolute(data)
+            phase = np.arctan2(np.imag(data),np.real(data))
+            data = np.concatenate([magn,phase],axis=rch)
+        else:
+            raise(Exception('Wrong complex_pairs'))
+
+    # OPTION : rcvr_to_timedim-------------------------------------------------
+
+    if rcvr_to_timedim:
+        timedim = data.shape[rch]*data.shape[3]
+        newshape = (data.shape[0],data.shape[1],data.shape[2],timedim)
+        data = np.reshape(data,newshape, order='c')
+
+    # OPTION : combine_rcvrs---------------------------------------------------
+
+    if combine_rcvrs == 'ssos':
+
+        data = vj.core.recon.ssos(data,axis=4)
+
+    # set affine as none to use the one in header
+    img = nib.Nifti1Image(data, None, varr.nifti_header)
+    # create directories if not exists
+    basedir = out_name.rsplit('/',1)[0]
+    if not os.path.exists(basedir):
+        os.makedirs(basedir)
     nib.save(img,out_name)
     os.system('gzip -f '+str(out_name))
     vprint('write_nifti : '+str(out_name)+' saved ... ')
 
-def _make_nifti_header(varray):
-    """Make Nifti header from attributes of varray"""
-    affine = _make_nifti_affine(varray.pd)
-    header = nib.nifti1.Nifti1Header()
-    data = varray.data
-    header['xyzt_units'] = 2
-    header['dim'][0] = len(self.data.shape)
-    header['dim'][1:4] = data.shape[0:3]
-    header['intent_name'] = varray.intent
-    # TODO write procpar from pd maybe?
-    header['aux_file'] = varray.procpar
-    header.set_qform(affine, code=qform_code)
+    if save_procpar:
+        new_pp = out_name[:-3]+'procpar'
+        try:
+            copyfile(varr.procpar, new_pp)
+        except:
+            pdname = out_name[:-3]+'json'
+            vj.core.utils.savepd(varr.pd,pdname)
+            warnings.warn('Could not copy procpar. Saved dictionary as json.')
 
-    return header
-
-def _make_nifti_affine(varray):
-
-    pass

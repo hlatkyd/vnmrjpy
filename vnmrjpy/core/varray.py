@@ -4,6 +4,14 @@ from functools import reduce
 from vnmrjpy.core.utils import vprint
 import warnings
 
+"""
+vnmrjpy.varray
+==============
+
+Contaions the main varray object, and the basic k-space and image space
+building methods as well as conversion between the two.
+
+"""
 class varray():
     """Main vnmrjpy object to carry data and reconstruction information.
 
@@ -35,6 +43,10 @@ class varray():
         self.seqcon = seqcon
         self.apptype = apptype
     
+    def set_nifti_header(self):
+
+        return vj.core.niftitools._set_nifti_header(self)
+
     # put the transforms into another file for better visibility
 
     def to_local(self):
@@ -83,11 +95,16 @@ class varray():
         PREVIOUS:
                 ([rcvrs, phase, read, slice, echo*time])
         NOW:
-                ([read, phase, slice, echo*time, rcvrs])
+                ([phase, read, slice, echo*time, rcvrs])
         """
         # if data is not from fid, just fft it
         if self.vdtype == 'imagespace':
             raise(Exception('not implemented yet'))        
+            #TODO something like this:
+
+            #self.data = vj.core.recon._fft(self.data,dims)
+            #self.vdype = 'kspace'                
+
         # check if data is really from fid
         if self.vdtype is not 'fid':
             raise(Exception('varray data is not fid data.'))
@@ -479,9 +496,20 @@ class varray():
         # new : [read, phase, slice, time, rcvrs]
 
         self.data = np.moveaxis(self.data,[0,1,2,3,4],[4,1,0,2,3])
+        # swap axes 0 and 1 so phase, readout etc is the final order
+        self.data = np.swapaxes(self.data,0,1)
         self.space='local'
         self.vdtype='kspace'
-        self.sdims = ['read','phase','slice','time','rcvr']
+        self.sdims = ['phase','read','slice','time','rcvr']
+        self.set_nifti_header()
+
+
+        if vj.config['default_space'] == None:
+            pass
+        elif vj.config['default_space'] == 'anatomical'
+            pass
+        elif vj.config['default_space'] == 'scanner'
+            pass
         
         return self
 
@@ -508,15 +536,15 @@ class varray():
 
         if seqfil in ['gems', 'fsems', 'mems', 'sems', 'mgems']:
 
-            self.data = _ifft(self.data,sa[0:2])
+            self.data = vj.core.recon._ifft(self.data,sa[0:2])
 
         elif seqfil in ['ge3d','fsems3d','mge3d']:
             
-            self.data = _ifft(self.data,sa)
+            self.data = vj.core.recon._ifft(self.data,sa)
 
         elif seqfil in ['ge3d_elliptical']:
 
-            self.data = _ifft(self.data,sa)
+            self.data = vj.core.recon._ifft(self.data,sa)
 
         else:
             raise Exception('Sequence reconstruction not implemented yet')
@@ -525,16 +553,3 @@ class varray():
 
         return self
 
-def _ifft(data, dims):
-    """Take the inverse fourier transform of kspace data"""
-    data = np.fft.fftshift(data,axes=dims) 
-    if len(dims) == 2:
-        data = np.fft.ifft2(data,axes=dims,norm='ortho')
-    elif len(dims) == 3:
-        data = np.fft.ifftn(data,axes=dims,norm='ortho')
-    data = np.fft.ifftshift(data,axes=dims)
-    return data
-
-def _fft(data, dims):
-    """Take the inverse fourier transform of imagespace data"""
-    pass
