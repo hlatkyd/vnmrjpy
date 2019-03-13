@@ -219,9 +219,11 @@ def read_fid(fid,procpar=None):
 
     # fid data ready, now create varray class
     arr = _get_arrayed_par_length(pd)
+    sdim = ['phase', 'read', 'slice', 'time', 'rcvr']
     return  vj.varray(data=fid_data,space='fid',pd=pd,fid_header=header_dict,\
                         source='fid',dtype=vj.DTYPE, seqcon=pd['seqcon'],\
-                        apptype=pd['apptype'],arrayed_params=arr,vdtype='fid')
+                        apptype=pd['apptype'],arrayed_params=arr,vdtype='fid',\
+                        sdims = sdim)
 
 def read_fdf(path):
     """Return vnmrjpy.varray from varian .fdf files
@@ -392,11 +394,15 @@ def read_fdf(path):
      
     # making vnmrjpy.varray
     arrayed_params = _get_arrayed_par_length(pd) 
-    return vj.varray(data=data_array, fdf_header=header_dict, pd=pd,\
+    
+    varr = vj.varray(data=data_array, fdf_header=header_dict, pd=pd,\
                     dtype=vj.DTYPE, source='fdf', seqcon=pd['seqcon'],\
                     apptype=pd['apptype'],arrayed_params=arrayed_params,\
                     vdtype='image')
-
+    
+    varr.space = 'local'
+    varr.set_nifti_header()
+    return varr
 
 def _get_arrayed_par_length(pd):
     """Return tuple of (name, length) of arrayed acquisition parameters

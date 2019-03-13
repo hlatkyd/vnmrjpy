@@ -9,10 +9,12 @@ def _set_nifti_header(varr):
     # init empty header
     header = nib.nifti1.Nifti1Header()
 
-    if varr.space == 'scanner':
+    if varr.space == 'anatomical':
 
-        pass
         # use sform
+        
+        #TODO or use q form as well??
+        return varr
 
     
     elif varr.space == 'local':
@@ -32,7 +34,7 @@ def _set_nifti_header(varr):
             header['pixdim'][i+1] = d[i]
 
         # set local dim info
-        header.set_dim_info(freq=0,phase=1,slice=2)
+        header.set_dim_info(freq=1,phase=0,slice=2)
 
         # setting qform
         header['qform_code'] = 1
@@ -124,7 +126,6 @@ def _qform_rot_matrix(pd):
                     [sin(t), cos(t), 0],\
                     [0,     0,      1]])
     m = rot_x @ rot_y @ rot_z 
-    print(m)
 
     #matrix = np.eye(3)
     return m

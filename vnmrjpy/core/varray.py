@@ -25,7 +25,7 @@ class varray():
                 is_kspace_complete=False, fid_header=None, fdf_header=None,\
                 nifti_header=None, space=None, intent=None,dtype=None,\
                 arrayed_params=[None,1], seqcon=None, apptype=None,\
-                vdtype=None):
+                vdtype=None, sdims=None, dims=None):
 
         self.data = data
         self.pd = pd
@@ -42,6 +42,8 @@ class varray():
         self.arrayed_params = arrayed_params
         self.seqcon = seqcon
         self.apptype = apptype
+        self.sdims = sdims
+        self.dims = dims
     
     def set_nifti_header(self):
 
@@ -506,9 +508,9 @@ class varray():
 
         if vj.config['default_space'] == None:
             pass
-        elif vj.config['default_space'] == 'anatomical'
-            pass
-        elif vj.config['default_space'] == 'scanner'
+        elif vj.config['default_space'] == 'anatomical':
+            self.to_anatomical()
+        elif vj.config['default_space'] == 'scanner':
             pass
         
         return self
@@ -533,6 +535,7 @@ class varray():
         pe2_dim = self.sdims.index('slice')  # slice dim is also pe2 dim
         
         sa = (ro_dim, pe_dim, pe2_dim)
+        print('toimgspace dims {}'.format(sa))
 
         if seqfil in ['gems', 'fsems', 'mems', 'sems', 'mgems']:
 
