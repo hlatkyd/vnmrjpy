@@ -8,18 +8,39 @@ def _set_nifti_header(varr):
     """Set varray.nifti_header attribute for the current space"""
     # init empty header
     header = nib.nifti1.Nifti1Header()
+    # use qform only
 
+    # Transform, so q_affine is diagonal
     if varr.space == 'anatomical':
 
-        # use sform
+        qfac = 1
+        dim_count = len(varr.data.shape)
+        header['dim'][0] = dim_count
+        for i in range(dim_count):
+            header['dim'][i+1] = varr.data.shape[i]
+        # setting pixdim based on procpar data
+        d = _get_pixdims(varr.pd)
+        swap,flip = vj.core.transform._anatomical_swaps(varr.pd)
+        d_swap = [i[1] for i in sorted(zip(swap,d))]
+        # rotate pixdim
+        # see qfac in doc
+        header['pixdim'][0] = qfac
+        for i in range(3):
+            header['pixdim'][i+1] = d_swap[i]
+
+        # set local dim info
+        header.set_dim_info(freq=swap[1],phase=swap[0],slice=swap[2])
+
+        # setting qform
+        header['qform_code'] = 1
+        q_affine = _qform_affine(varr,qfac)
         
-        #TODO or use q form as well??
-        return varr
-
-    
+        header.set_qform(q_affine,code=1)
+   
+    # Original without any transformation 
     elif varr.space == 'local':
-
-        # use qform only
+        
+        qfac = 1  # qfac: -1 if left handed
         dim_count = len(varr.data.shape)
         header['dim'][0] = dim_count
         for i in range(dim_count):
@@ -28,7 +49,6 @@ def _set_nifti_header(varr):
         d = _get_pixdims(varr.pd)
         
         # see qfac in doc
-        qfac = 1
         header['pixdim'][0] = qfac
         for i in range(3):
             header['pixdim'][i+1] = d[i]
@@ -38,7 +58,7 @@ def _set_nifti_header(varr):
 
         # setting qform
         header['qform_code'] = 1
-        q_affine = _qform_affine(varr)
+        q_affine = _qform_affine(varr,qfac)
         
         header.set_qform(q_affine,code=1)
 
@@ -87,21 +107,43 @@ def _get_translations(pd):
     #TODO
     return (0,0,0)
 
-def _qform_affine(varr):
-    """Return qform affine if dat is in local space"""
+def _qform_affine(varr,qfac):
+    """Return qform affine"""
     if varr.space == 'local':
-        pass
-    else:
+        pixdim = _get_pixdims(varr.pd)
+        trans = _get_translations(varr.pd)
+        rot = _qform_rot_matrix(varr.pd)
+        trans = _translation_to_xyz(trans, rot)
+        pixdim_matrix = np.eye(3)*pixdim
+        pixdim_matrix[2,2] = pixdim_matrix[2,2]*qfac
+
+        affine = np.zeros((4,4))
+        affine[0:3,0:3] = rot @ pixdim_matrix 
+        affine[0:3,3] = trans
+        affine[3,3] = 1
+    elif varr.space == 'anatomical':
+        # make the affine diagonal in this case
         warnings.warn('Not in local space, affine probably incorrect')
-    pixdim = _get_pixdims(varr.pd)
-    trans = _get_translations(varr.pd)
-    rot = _qform_rot_matrix(varr.pd)
-    trans = _translation_to_xyz(trans, rot)
-    pixdim_matrix = np.eye(3)*pixdim
-    affine = np.zeros((4,4))
-    affine[0:3,0:3] = rot @ pixdim_matrix 
-    affine[0:3,3] = trans
-    affine[3,3] = 1
+        pixdim = _get_pixdims(varr.pd)
+        trans = _get_translations(varr.pd)
+        rot = _qform_rot_matrix(varr.pd)
+        pixdim = _pixdim_to_xyz(pixdim, varr.pd)
+        # TODO
+        #trans = _translation_to_xyz(trans, rot)
+        # just make translations 0 for now
+        trans = [0,0,0]
+
+        pixdim_matrix = np.eye(3)*pixdim
+        pixdim_matrix[2,2] = pixdim_matrix[2,2]*qfac
+        aff_3x3 = np.eye(3) * pixdim_matrix
+
+        affine = np.zeros((4,4))
+        affine[0:3,0:3] = aff_3x3
+        affine[0:3,3] = trans
+        affine[3,3] = 1
+        print(affine)
+    else:
+        raise(Exception('Cant calc q_form affine in this space'))
     return affine
 
 
@@ -134,3 +176,12 @@ def _translation_to_xyz(t, rot_matrix):
     """Return translation vector in x,y,z from ro,pe,slc"""
     #TODO
     return t
+
+def _pixdim_to_xyz(pixdim, pd):
+
+    swap, flip = vj.core.transform._anatomical_swaps(pd)
+    print('swap pixdim_xyx {}'.format(swap))
+    pixdim = [i[1] for i in sorted(zip(swap,pixdim))]
+    print('pixdim in to xyz {}'.format(pixdim))
+    return pixdim
+

@@ -1,0 +1,15 @@
+Main structure after revamp. Contains only revamp files.
+
+vnmrjpy
+    vnmrjpy
+        core
+            varray.py
+            read.py
+            write.py
+            recon.py
+            niftitools.py
+        fit
+        bin
+            niview
+            
+    test

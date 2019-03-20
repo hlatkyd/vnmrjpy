@@ -34,7 +34,7 @@ class varray():
         self.space = space
         self.dtype= dtype
         self.vdtype = vdtype
-        self.is_zerofileld = is_zerofilled
+        self.is_zerofilled = is_zerofilled
         self.is_kspace_complete = is_kspace_complete
         self.fid_header = fid_header
         self.fdf_header = fid_header
@@ -49,11 +49,15 @@ class varray():
 
         return vj.core.niftitools._set_nifti_header(self)
 
+    def set_dims(self):
+        """Set dims, meaning x,y,z axes order""" 
+        return vj.core.transform._set_dims(self)
+
     # put the transforms into another file for better visibility
 
     def to_local(self):
         """Transform to original space at k-space formation"""
-        pass
+        return vj.core.transform._to_local(self)
 
     def to_scanner(self):
         """Transform data to scanner coordinate space by properly swapping axes
@@ -500,18 +504,13 @@ class varray():
         self.data = np.moveaxis(self.data,[0,1,2,3,4],[4,1,0,2,3])
         # swap axes 0 and 1 so phase, readout etc is the final order
         self.data = np.swapaxes(self.data,0,1)
-        self.space='local'
         self.vdtype='kspace'
-        self.sdims = ['phase','read','slice','time','rcvr']
-        self.set_nifti_header()
 
-
+        self.to_local()
         if vj.config['default_space'] == None:
             pass
         elif vj.config['default_space'] == 'anatomical':
             self.to_anatomical()
-        elif vj.config['default_space'] == 'scanner':
-            pass
         
         return self
 
@@ -535,7 +534,6 @@ class varray():
         pe2_dim = self.sdims.index('slice')  # slice dim is also pe2 dim
         
         sa = (ro_dim, pe_dim, pe2_dim)
-        print('toimgspace dims {}'.format(sa))
 
         if seqfil in ['gems', 'fsems', 'mems', 'sems', 'mgems']:
 

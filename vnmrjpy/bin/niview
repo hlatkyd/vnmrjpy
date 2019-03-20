@@ -42,6 +42,7 @@ class Niview():
             # reading fid gets more options:
             varr = vj.core.read_fid(fid)
             varr.to_kspace()
+            self.affine = varr.nifti_header.get_qform()
             if to_anatomical:
                 varr.to_anatomical()
 

@@ -97,5 +97,6 @@ def write_nifti(varr,out, save_procpar=True,\
         except:
             pdname = out_name[:-3]+'json'
             vj.core.utils.savepd(varr.pd,pdname)
-            warnings.warn('Could not copy procpar. Saved dictionary as json.')
+            # TODO consider saving only in json
+            #warnings.warn('Could not copy procpar. Saved dictionary as json.')
 

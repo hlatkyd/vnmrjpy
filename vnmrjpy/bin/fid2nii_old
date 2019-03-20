@@ -25,17 +25,30 @@ def fid2nii(indir,
         if not os.path.exists(out):
             os.makedirs(out)
 
+    fid = indir + '/fid'
     procpar = indir + '/procpar'
-    varr = vj.core.read_fid(indir).to_kspace().to_anatomical()
+    ppdict = vj.io.ProcparReader(procpar).read()
+    fid_data, fid_header = vj.io.FidReader(fid, procpar).read()
+    kspace = vj.recon.KspaceMaker(fid_data, fid_header, procpar).make()
+    kspace = vj.recon.KspaceCompleter(kspace, procpar).make()
+    imgspace = vj.recon.ImageSpaceMaker(kspace, procpar).make() 
 
+    kspace_real = [] # put separate channel data into separate lements of list
+    kspace_imag = []
+    
     if save_kspace == True:
-        pass
+        for i in range(len(ppdict['rcvrs'])):
+            kspace_real.append(np.real(kspace[i,...]))
+            kspace_imag.append(np.imag(kspace[i,...]))
+            writer1 = vj.io.NiftiWriter(kspace_real[-1], procpar)
+            writer1.write(out+'kspace_real_ch'+str(i))
+            writer2 = vj.io.NiftiWriter(kspace_imag[-1], procpar)
+            writer2.write(out+'kspace_imag_ch'+str(i))
 
     if save_imgspace == True:
-        varr.to_imagespace()
-        seqname = indir.rsplit('/',1)[-1][:-3]+'nii'
-        fin_out = out + seqname
-        vj.core.write_nifti(varr, fin_out)
+        sumimg = np.sum(np.absolute(imgspace), axis=0)
+        writer_img = vj.io.NiftiWriter(sumimg, procpar)
+        writer_img.write(out)
 
     if saveprocpar == True and costumout == True:
         copyfile(procpar, out+'/procpar')

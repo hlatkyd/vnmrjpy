@@ -44,13 +44,15 @@ def _to_anatomical(varr):
     # better method is via rotation matrix
     swapaxes, flipaxes = _anatomical_swaps(varr.pd)
     
-    # setting data
+    # setting data: 90deg rotation is done by swapping and flipping
     oldaxes = [i for i in range(varr.data.ndim)]
     newaxes = copy.copy(oldaxes)
     newaxes[0:3] = swapaxes
+    print('oldaxes {}, newaxes {}'.format(oldaxes, newaxes))
     varr.data = np.moveaxis(varr.data, newaxes, oldaxes) 
+    #varr.data = np.moveaxis(varr.data, oldaxes, newaxes) 
     
-    #varr.data = np.moveaxis(varr.data, oldaxes, newaxes)
+    # ------flipping as part of rotation----------------------
     varr.data = _flip_axes(varr.data,flipaxes)
 
     # setting sdims
@@ -61,9 +63,16 @@ def _to_anatomical(varr):
     
     new_sdims = new_sdims_partial+sdims_kept
 
-    varr.sdims = new_sdims
-    #varr.set_nifti_header()
     varr.space = 'anatomical'
+    varr.set_dims()
+    varr.sdims = new_sdims
+    print(varr.dims)
+    print(varr.sdims)
+    # -----additional custom flip data on axes------------------
+
+
+    # update header
+    varr.set_nifti_header()
 
     return varr
 
@@ -72,7 +81,27 @@ def _to_global(varr):
     return varr
 
 def _to_local(varr):
-    """Transform back to [phase, read, slice, etc..]"""
+    """Transform to [phase, read, slice, etc..]
+
+    Sets appropriate varray attributes including nifti_header
+    If it is first called from to_kspace() automatically, and also from other
+    'read' methods
+    """
+    #TODO autocall from other read functions
+    # if space is None, then the call is from to_kspace()
+    if varr.space == None:
+    
+        varr.space = 'local'
+        varr.sdims = ['phase','read','slice','time','rcvr']
+        varr.set_dims()
+        varr.set_nifti_header()
+
+    elif varr.space == 'anatomical':
+        raise(Exception('not implemented yet'))
+    elif varr.space == 'local':
+        # do nothing, already in local space
+        return varr 
+
     return varr
 
 def _check90deg(pd):
@@ -88,25 +117,6 @@ def _flip_axes(data,axes):
     for ax in axes:
         data = np.flip(data, axis=ax)
     return data
-
-# TODO consider delete
-def _flip_axes_deprecated(varr,axes):
-    """Flip varr.data on multiple axes.
-
-    Args:
-        axes -- Can be a list of 'read','phase','slice', or 'x','y','z'
-    """
-    axnum_list = []
-    try:
-        for ax in axes:
-            axnum = varr.dims.index(ax)
-            axnum_list.append(axnum)
-    except:
-        axnum = varr.sdims.index(ax)
-        axnum_list.append(axnum)
-    for ax in axnum_list:
-        varr.data = np.flip(varr.data,axis=ax)
-    return varr
 
 def _anatomical_swaps(pd):
     """Return sdims for anatomical oriantation"""
@@ -131,3 +141,19 @@ def _move_sdims(varr,sdims_new):
     # set new sdims
     varr.sdims = sdims_new
     return varr
+
+
+def _set_dims(varr):
+    """Return varray dims"""
+    if varr.space == 'local':
+        if varr.dims != None:
+            return varr
+        swapax, flipax = _anatomical_swaps(varr.pd)
+
+    elif varr.space == 'anatomical':
+        # TODO set dims only if 90 deg rot case
+        if _check90deg(varr.pd): 
+            varr.dims = ['x','y','z']
+        else:
+            varr.dims = 'oblique'
+        return varr
