@@ -35,9 +35,11 @@ class Niview():
         elif img is not None:
 
             varr = vj.core.read_fdf(img)
+            #if to_anatomical:
+            #    varr.to_anatomical()
+
             self.data = varr.data
             self.affine = varr.nifti_header.get_qform()
-                
         elif fid is not None:
             # reading fid gets more options:
             varr = vj.core.read_fid(fid)

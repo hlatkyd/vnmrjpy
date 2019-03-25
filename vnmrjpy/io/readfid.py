@@ -130,9 +130,12 @@ class FidReader():
             dt = '>i2'
         for k,block in enumerate(block_list): # for each block
             block_header = block[:28] # separate block header
+            bh = decode_blockhead(block_header)
+            self.print_blockheader()
             block_data = block[28:]
             DATA[k,:] = np.frombuffer(bytearray(block_data),dt)
 
+        #self.blockhead_dict = decode_blockhead(block_header)
         return DATA, self.header_dict
 
     def print_header(self):

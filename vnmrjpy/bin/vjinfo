@@ -33,12 +33,16 @@ def main():
         fid = infile+'/fid'
         procpar = infile+'/procpar'
         rdr = FidReader(fid,procpar)
+        rdr.read()
         rdr.print_header()
+        rdr.print_blockheader()
 
     elif infile.endswith('fid') and not os.path.isdir(infile):
         fid = infile
         rdr = FidReader(fid)
+        rdr.read()
         rdr.print_header()
+        rdr.print_blockheader()
 
     elif infile.endswith('fdf') and not os.path.isdir(infile):
         fdf = infile

@@ -48,7 +48,6 @@ def _to_anatomical(varr):
     oldaxes = [i for i in range(varr.data.ndim)]
     newaxes = copy.copy(oldaxes)
     newaxes[0:3] = swapaxes
-    print('oldaxes {}, newaxes {}'.format(oldaxes, newaxes))
     #varr.data = np.moveaxis(varr.data, newaxes, oldaxes) 
     varr.data = np.moveaxis(varr.data, oldaxes, newaxes) 
     
@@ -66,15 +65,16 @@ def _to_anatomical(varr):
     varr.space = 'anatomical'
     varr.set_dims()
     varr.sdims = new_sdims
-    print(varr.dims)
-    print(varr.sdims)
     # -----additional custom flip data on axes------------------
 
     #this is 
     #varr.flip_axis('z')
     #varr.flip_axis('phase')
     #varr.flip_axis('slice')
-
+    
+    # 3D should be flipped. Dunno why, but seems to work
+    if varr.pd['apptype'] in ['im3D','im3Dfse']:
+        varr.flip_axis('slice')
 
     # update header
     varr.set_nifti_header()
@@ -99,7 +99,6 @@ def _to_local(varr):
         varr.space = 'local'
         varr.sdims = ['phase','read','slice','time','rcvr']
         varr.set_dims()
-        print(varr.dims)
         if vj.config['swap_x_grad'] == True:
             varr.flip_axis('x')
         varr.set_nifti_header()
@@ -214,11 +213,9 @@ def _flip_axis(varr,axis):
     if axis in varr.dims:
         ax = varr.dims.index(axis)
         varr.data = np.flip(varr.data,axis=ax)
-        print('flipping axis {}'.format(axis))
     elif axis in varr.sdims:
         ax = varr.sdims.index(axis)
         varr.data = np.flip(varr.data,axis=ax)
-        print('flipping axis {}'.format(axis))
     else:
         raise(Exception('Axis not specified correctly'))
     

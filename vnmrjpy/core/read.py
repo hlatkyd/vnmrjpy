@@ -400,8 +400,9 @@ def read_fdf(path):
                     apptype=pd['apptype'],arrayed_params=arrayed_params,\
                     vdtype='image',space=None)
     
-    varr.space = 'local'
+    varr.space = None
     varr.set_nifti_header()
+    varr.to_local()
     return varr
 
 def _get_arrayed_par_length(pd):

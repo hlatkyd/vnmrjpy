@@ -141,7 +141,7 @@ def _qform_affine(varr,qfac):
         affine[0:3,0:3] = aff_3x3
         affine[0:3,3] = trans
         affine[3,3] = 1
-        print(affine)
+        #print(affine)
     else:
         raise(Exception('Cant calc q_form affine in this space'))
     return affine
@@ -180,8 +180,6 @@ def _translation_to_xyz(t, rot_matrix):
 def _pixdim_to_xyz(pixdim, pd):
 
     swap, flip = vj.core.transform._anatomical_swaps(pd)
-    print('swap pixdim_xyx {}'.format(swap))
     pixdim = [i[1] for i in sorted(zip(swap,pixdim))]
-    print('pixdim in to xyz {}'.format(pixdim))
     return pixdim
 

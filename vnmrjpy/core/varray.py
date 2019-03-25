@@ -211,13 +211,15 @@ class varray():
 
         def make_im2Depi():
 
-            p = self.p
-            kspace = self.pre_kspace
-            print(kspace.shape)
+            p = self.pd
+            comp_seg = p['cseg']
+            altread = p['altread']
             nseg = p['nseg']
             kzero = int(p['kzero'])  
             images = int(p['images'])  # repetitions
             time = images
+            echo = 1
+            rcvrs = int(p['rcvrs'].count('y'))
             if p['navigator'] == 'y':
                 pluspe = 1 + int(p['nnav'])  # navigator echo + unused
             else:
@@ -228,6 +230,7 @@ class varray():
             print('ns {}'.format(p['ns']))
             
             if p['pro'] != 0:
+                print('pro not 0')
                 (read, phase, slices) = (int(p['nread']), \
                                             int(p['nphase']), \
                                             int(p['ns']))
@@ -236,13 +239,23 @@ class varray():
                                             int(p['nphase']), \
                                             int(p['ns']))
             
-            if p['seqcon'] == 'ncnnn':
+            print('read {}, phase {}, slices {}'.format(read,phase, slices))
+            finalshape = (rcvrs, phase, read, slices,echo*time*array_length)
+            final_kspace = np.zeros(finalshape,dtype='complex64')
+            print('fid data shape {}'.format(self.data.shape))
 
-                preshape = (self.rcvrs, phase+pluspe, slices, time, read)
-                print(kspace.size)
-                tmp = np.zeros(preshape)
-                print(tmp.size)
-                kspace = np.reshape(kspace, preshape, order='c')
+            for i in range(array_length):
+ 
+                kspace = self.data[i*blocks:(i+1)*blocks,...]
+
+                if p['seqcon'] == 'ncnnn':
+
+                    preshape = (rcvrs, phase+pluspe, slices, time, read)
+                    print('kspace size {} '.format(kspace.size))
+                    print('preshape {}'.format(preshape))
+                    tmp = np.zeros(preshape)
+                    print(tmp.size)
+                    kspace = np.reshape(kspace, preshape, order='c')
 
         def make_im2Depics():
             raise(Exception('not implemented'))

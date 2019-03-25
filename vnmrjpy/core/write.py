@@ -15,7 +15,8 @@ def write_nifti(varr,out, save_procpar=True,\
                         save_complex=False,\
                         rcvr_to_timedim=False,\
                         complex_pairs='magn-phase',\
-                        combine_rcvrs='ssos'):
+                        combine_rcvrs='ssos',\
+                        cut_to_3d=False):
     """Write Nifti1 files from vnmrjpy.varray.
   
     You can specify the data to be saved 
@@ -79,7 +80,15 @@ def write_nifti(varr,out, save_procpar=True,\
     if combine_rcvrs == 'ssos':
 
         data = vj.core.recon.ssos(data,axis=4)
-
+        # cut dimensions more than 3. This is mainly for use with certain FSL calls
+        if cut_to_3d:
+            if len(data.shape) == 4:
+                data = data[...,0]
+            elif len(data.shape) == 5:
+                data = data[...,0,0]
+            else:
+                raise(Exception('Not implemented'))
+            print('shape in nifti_write {}'.format(data.shape))
     # set affine as none to use the one in header
     img = nib.Nifti1Image(data, None, varr.nifti_header)
     # create directories if not exists

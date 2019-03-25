@@ -8,7 +8,9 @@ vnmrjpy
             write.py
             recon.py
             niftitools.py
-        fit
+            transform.py
+        func
+            composer.py
         bin
             niview
             

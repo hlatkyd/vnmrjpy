@@ -20,6 +20,7 @@ from . import recon
 from . import io
 from . import util
 from . import fit
+from . import func
 
 # declare for easy testing
 
