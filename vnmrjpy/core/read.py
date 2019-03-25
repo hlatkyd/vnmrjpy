@@ -220,7 +220,7 @@ def read_fid(fid,procpar=None):
     # fid data ready, now create varray class
     arr = _get_arrayed_par_length(pd)
     sdim = ['phase', 'read', 'slice', 'time', 'rcvr']
-    return  vj.varray(data=fid_data,space='fid',pd=pd,fid_header=header_dict,\
+    return  vj.varray(data=fid_data,space=None,pd=pd,fid_header=header_dict,\
                         source='fid',dtype=vj.DTYPE, seqcon=pd['seqcon'],\
                         apptype=pd['apptype'],arrayed_params=arr,vdtype='fid',\
                         sdims = sdim)
@@ -398,7 +398,7 @@ def read_fdf(path):
     varr = vj.varray(data=data_array, fdf_header=header_dict, pd=pd,\
                     dtype=vj.DTYPE, source='fdf', seqcon=pd['seqcon'],\
                     apptype=pd['apptype'],arrayed_params=arrayed_params,\
-                    vdtype='image')
+                    vdtype='image',space=None)
     
     varr.space = 'local'
     varr.set_nifti_header()

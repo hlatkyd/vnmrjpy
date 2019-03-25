@@ -49,8 +49,8 @@ def _to_anatomical(varr):
     newaxes = copy.copy(oldaxes)
     newaxes[0:3] = swapaxes
     print('oldaxes {}, newaxes {}'.format(oldaxes, newaxes))
-    varr.data = np.moveaxis(varr.data, newaxes, oldaxes) 
-    #varr.data = np.moveaxis(varr.data, oldaxes, newaxes) 
+    #varr.data = np.moveaxis(varr.data, newaxes, oldaxes) 
+    varr.data = np.moveaxis(varr.data, oldaxes, newaxes) 
     
     # ------flipping as part of rotation----------------------
     varr.data = _flip_axes(varr.data,flipaxes)
@@ -70,6 +70,11 @@ def _to_anatomical(varr):
     print(varr.sdims)
     # -----additional custom flip data on axes------------------
 
+    #this is 
+    #varr.flip_axis('z')
+    #varr.flip_axis('phase')
+    #varr.flip_axis('slice')
+
 
     # update header
     varr.set_nifti_header()
@@ -77,7 +82,7 @@ def _to_anatomical(varr):
     return varr
 
 def _to_global(varr):
-
+    raise(Exception('Not implemented'))
     return varr
 
 def _to_local(varr):
@@ -94,6 +99,9 @@ def _to_local(varr):
         varr.space = 'local'
         varr.sdims = ['phase','read','slice','time','rcvr']
         varr.set_dims()
+        print(varr.dims)
+        if vj.config['swap_x_grad'] == True:
+            varr.flip_axis('x')
         varr.set_nifti_header()
 
     elif varr.space == 'anatomical':
@@ -119,16 +127,52 @@ def _flip_axes(data,axes):
     return data
 
 def _anatomical_swaps(pd):
-    """Return sdims for anatomical oriantation"""
+    """Return swap and flip arrays for data transform to anatomical
 
-    rot_matrix = vj.core.niftitools._qform_rot_matrix(pd)
-    inv = np.linalg.inv(rot_matrix).astype(int)
-    swap = inv.dot(np.array([1,2,3], dtype=int))
-    flipaxes = []
-    for num, i in enumerate(swap):
-        if i < 0:
-            flipaxes.append(num)
-    swapaxes = (np.abs(swap) - 1).astype(int)
+    use_hardcoded: no-brain implementation for 90deg rots
+    """
+    use_hardcoded = True
+    # hardcoded for 90degs
+    if use_hardcoded:
+        if _check90deg(pd) != True:
+            raise(Exception('Not implemented'))
+
+        ori = pd['orient']
+        if ori == 'trans':
+            #swap = [0,1,2]
+            swap = [0,2,1]
+            flip = [1,2]
+        elif ori == 'trans90':
+            #swap = [1,0,2]
+            swap = [2,0,1]
+            flip = [0]
+        elif ori == 'sag':
+            #swap = [1,2,0]
+            swap = [2,1,0]
+            flip = [1,2]
+        elif ori == 'sag90':
+            #swap = [2,1,0]
+            swap = [1,2,0]
+            flip = [0]
+        elif ori == 'cor':
+            #swap = [0,2,1]
+            swap = [0,1,2]
+            flip = [1]
+        elif ori == 'cor90':
+            swap = [1,0,2]
+            flip = []
+
+        return swap, flip
+    # with rot matrix
+    else:
+        rot_matrix = vj.core.niftitools._qform_rot_matrix(pd)
+        inv = np.linalg.inv(rot_matrix).astype(int)
+        swap = inv.dot(np.array([1,2,3], dtype=int))
+        flipaxes = []
+        for num, i in enumerate(swap):
+            if i < 0:
+                flipaxes.append(num)
+        swapaxes = (np.abs(swap) - 1).astype(int)
 
     return swapaxes, flipaxes
     
@@ -137,18 +181,25 @@ def _move_sdims(varr,sdims_new):
     """Move varray data aexes according to new sdims"""
 
     # move
-
     # set new sdims
     varr.sdims = sdims_new
     return varr
 
 
 def _set_dims(varr):
-    """Return varray dims"""
-    if varr.space == 'local':
+    """Set varray dims"""
+    if varr.space == 'local' or varr.space == None:
         if varr.dims != None:
             return varr
+        if _check90deg(varr.pd) != True: 
+            varr.dims = 'oblique'
+            return varr
         swapax, flipax = _anatomical_swaps(varr.pd)
+        swap = swapax
+        anat_dims = ['x','y','z']
+        dims = [i[1] for i in sorted(zip(swap,anat_dims))]
+        varr.dims = dims
+        return varr
 
     elif varr.space == 'anatomical':
         # TODO set dims only if 90 deg rot case
@@ -157,3 +208,18 @@ def _set_dims(varr):
         else:
             varr.dims = 'oblique'
         return varr
+
+def _flip_axis(varr,axis):
+    """Flip data on axis 'x','y','z' or 'phase','read','slice'"""
+    if axis in varr.dims:
+        ax = varr.dims.index(axis)
+        varr.data = np.flip(varr.data,axis=ax)
+        print('flipping axis {}'.format(axis))
+    elif axis in varr.sdims:
+        ax = varr.sdims.index(axis)
+        varr.data = np.flip(varr.data,axis=ax)
+        print('flipping axis {}'.format(axis))
+    else:
+        raise(Exception('Axis not specified correctly'))
+    
+    return varr

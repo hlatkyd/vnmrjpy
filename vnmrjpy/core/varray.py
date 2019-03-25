@@ -45,6 +45,10 @@ class varray():
         self.sdims = sdims
         self.dims = dims
     
+    def flip_axis(self,axis):
+        """Flip data on axis 'x','y','z' or 'phase','read','slice'"""
+        return vj.core.transform._flip_axis(self,axis)        
+
     def set_nifti_header(self):
 
         return vj.core.niftitools._set_nifti_header(self)
@@ -505,8 +509,8 @@ class varray():
         # swap axes 0 and 1 so phase, readout etc is the final order
         self.data = np.swapaxes(self.data,0,1)
         self.vdtype='kspace'
-
         self.to_local()
+
         if vj.config['default_space'] == None:
             pass
         elif vj.config['default_space'] == 'anatomical':
