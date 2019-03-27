@@ -3,6 +3,7 @@ import numpy as np
 from functools import reduce
 from vnmrjpy.core.utils import vprint
 import warnings
+import matplotlib.pyplot as plt
 
 """
 vnmrjpy.varray
@@ -25,7 +26,7 @@ class varray():
                 is_kspace_complete=False, fid_header=None, fdf_header=None,\
                 nifti_header=None, space=None, intent=None,dtype=None,\
                 arrayed_params=[None,1], seqcon=None, apptype=None,\
-                vdtype=None, sdims=None, dims=None):
+                vdtype=None, sdims=None, dims=None, description=None):
 
         self.data = data
         self.pd = pd
@@ -44,6 +45,7 @@ class varray():
         self.apptype = apptype
         self.sdims = sdims
         self.dims = dims
+        self.description = description
     
     def flip_axis(self,axis):
         """Flip data on axis 'x','y','z' or 'phase','read','slice'"""
@@ -212,14 +214,16 @@ class varray():
         def make_im2Depi():
 
             p = self.pd
+            
             comp_seg = p['cseg']
             altread = p['altread']
-            nseg = p['nseg']
+            nseg = int(p['nseg'])
+            etl = int(p['etl'])
             kzero = int(p['kzero'])  
             images = int(p['images'])  # repetitions
-            time = images
-            echo = 1
             rcvrs = int(p['rcvrs'].count('y'))
+            echo = 1
+
             if p['navigator'] == 'y':
                 pluspe = 1 + int(p['nnav'])  # navigator echo + unused
             else:
@@ -228,8 +232,22 @@ class varray():
             print('images {}'.format(images))
             print('nseg {}'.format(nseg))
             print('ns {}'.format(p['ns']))
-            
-            if p['pro'] != 0:
+            print('seqcon {}'.format(p['seqcon']))
+
+            # number of acquisitions based on epi ref.  
+            # see manual for explanation
+            epiref = p['epiref_type']
+            if epiref ==  'fulltriple':
+                time = 2 + 2*images
+            elif epiref == 'triple':
+                time = 3+images
+            elif epiref == 'single':
+                time = 1+images
+            elif epiref == 'none':
+                time = images
+            else:
+                raise(Exception('This type of epiref is not implemented'))
+            if int(p['pro']) != 0:
                 print('pro not 0')
                 (read, phase, slices) = (int(p['nread']), \
                                             int(p['nphase']), \
@@ -243,19 +261,73 @@ class varray():
             finalshape = (rcvrs, phase, read, slices,echo*time*array_length)
             final_kspace = np.zeros(finalshape,dtype='complex64')
             print('fid data shape {}'.format(self.data.shape))
+            print('blocks {}'.format(blocks))
 
             for i in range(array_length):
  
-                kspace = self.data[i*blocks:(i+1)*blocks,...]
+                prekspace = self.data[i*blocks:(i+1)*blocks,...]
+                print('kspace shape in outer {}'.format(prekspace.shape))
 
+                # this case repetiotions are in different blocks
                 if p['seqcon'] == 'ncnnn':
+                
+                    #kspace = np.zeros((rcvrs,etl+pluspe,slices,time,read),\
+                    #                    dtype='complex64')
+                    kspace = np.zeros((rcvrs,slices,etl+pluspe,time,read),\
+                                        dtype='complex64')
+                    for t in range(time):
 
-                    preshape = (rcvrs, phase+pluspe, slices, time, read)
-                    print('kspace size {} '.format(kspace.size))
-                    print('preshape {}'.format(preshape))
-                    tmp = np.zeros(preshape)
-                    print(tmp.size)
-                    kspace = np.reshape(kspace, preshape, order='c')
+                        kspace_t = prekspace[t*rcvrs:(t+1)*rcvrs,...]
+                        preshape = (rcvrs, slices, etl+pluspe, 1, read)
+                        kspace_t = np.reshape(kspace_t, preshape, order='c')
+                        
+                        kspace[...,t:t+1,:] = kspace_t
+                        # TODO
+                        # get navigator echoes out
+
+                        # TODO
+                        # navigator correct
+                    
+                    kspace = np.moveaxis(kspace,[0,1,2,3,4],[0,3,1,4,2])
+                    print('kspace shape HERE {}'.format(kspace.shape))
+                else:
+                    raise(Exception('This seqcon not implemented in epip'))
+
+                if _is_interleaved(p): # 1 if interleaved slices
+                    if _is_evenslices(p):
+                        c = np.zeros(kspace.shape, dtype='complex64')
+                        c[...,0::2,:] = kspace[...,:slices//2,:]
+                        c[...,1::2,:] = kspace[...,slices//2:,:]
+                        kspace = c
+                    else:
+                        c = np.zeros(kspace.shape, dtype='complex64')
+                        c[...,0::2,:] = kspace[...,:(slices+1)//2,:]
+                        c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]
+                        kspace = c
+
+                # -------------------epi kspace processing---------------------
+
+                # get navigator echo out of data
+                navigators = vj.core.epitools._get_navigator_echo(kspace,p)
+                # remove unused echo and navigator, fill rest up with 0
+                kspace = vj.core.epitools._prepare_shape(kspace,p)
+                #kspace = vj.core.epitools._kzero_shift(kspace,p)
+                kspace = vj.core.epitools._reverse_even(kspace)
+
+                final_kspace[...,i*echo*time:(i+1)*echo*time] = kspace
+                #TODO this is only for testing
+                img = final_kspace[1,:,:,10,3]
+                fft = np.fft.fftshift(img)
+                fft = np.fft.fft2(fft)
+                fft = np.fft.ifftshift(fft)
+                plt.subplot(1,2,1)
+                plt.imshow(np.absolute(img))
+                plt.subplot(1,2,2)
+                plt.imshow(np.absolute(fft))
+                plt.show()
+
+            self.data = final_kspace
+            return self
 
         def make_im2Depics():
             raise(Exception('not implemented'))

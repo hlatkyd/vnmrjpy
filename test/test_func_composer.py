@@ -16,21 +16,6 @@ class Test_Composer(unittest.TestCase):
         varr_ref.to_anatomical()
 
         test_workdir = vj.config['fsl_workdir']
-        vj.func.COMPOSER(varr,varr_ref,workdir=test_workdir,keepfiles=True)
-        """
-        procpar_ref = ref+'/procpar'
-        procpar = mems+'/procpar'
-        #make images
-        (data_ref, hdr_ref) = vj.io.FidReader(ref).read()
-        (data, hdr) = vj.io.FidReader(mems).read()
-        kspace_ref = vj.recon.KspaceMaker(data_ref, hdr_ref, procpar_ref).make()
-        kspace = vj.recon.KspaceMaker(data, hdr, procpar).make()
-        imgspace = vj.recon.ImageSpaceMaker(kspace, procpar).make()
-        imgspace_ref = vj.recon.ImageSpaceMaker(kspace_ref, procpar_ref).make()
-
-        #imgspace = vj.util.to_scanner_space(imgspace,procpar)
-        #imgspace_ref = vj.util.to_scanner_space(imgspace_ref,procpar_ref)
-        
-        comp = vj.recon.Composer(imgspace, imgspace_ref, procpar, procpar_ref)
-        comp.flirt_registration()
-        """
+        varr_matched = vj.func.COMPOSER(varr,varr_ref,\
+                            workdir=None,keepfiles=False)
+        self.assertEqual(varr_matched.data.shape,varr.data.shape)

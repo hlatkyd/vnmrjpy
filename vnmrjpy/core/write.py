@@ -71,6 +71,7 @@ def write_nifti(varr,out, save_procpar=True,\
     # OPTION : rcvr_to_timedim-------------------------------------------------
 
     if rcvr_to_timedim:
+        rch = 4
         timedim = data.shape[rch]*data.shape[3]
         newshape = (data.shape[0],data.shape[1],data.shape[2],timedim)
         data = np.reshape(data,newshape, order='c')
@@ -88,7 +89,6 @@ def write_nifti(varr,out, save_procpar=True,\
                 data = data[...,0,0]
             else:
                 raise(Exception('Not implemented'))
-            print('shape in nifti_write {}'.format(data.shape))
     # set affine as none to use the one in header
     img = nib.Nifti1Image(data, None, varr.nifti_header)
     # create directories if not exists
