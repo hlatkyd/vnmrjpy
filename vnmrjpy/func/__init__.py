@@ -13,4 +13,6 @@ Includes:
     #etc
 
 from .composer import *
+from .wasabi import *
+from .base import *
 
