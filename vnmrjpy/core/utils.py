@@ -2,6 +2,15 @@ import vnmrjpy as vj
 import os
 import json
 
+"""
+Collection of unsorted utility functions. Includes:
+    
+    vprint -- print if verbose is True
+    savepd -- save procpar dictionary to json
+    loadpd -- load procpar dictionary from json
+
+"""
+
 def vprint(string):
 
     if vj.config['verbose']==True:

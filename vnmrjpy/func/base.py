@@ -16,7 +16,6 @@ def mask(varr, threshold=None):
     Noise threshold is assumed if set to None
 
     """ 
-    data varr.data
     return varr
 
 def average(*varr_list):

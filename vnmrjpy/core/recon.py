@@ -22,6 +22,10 @@ def _fft(data, dims):
 
 def ssos(data,axis=4):
     """Return squared sum of squares combination of receiver data"""
-    data = np.sqrt(np.sum(np.absolute(data)**2,axis=axis))
-    return np.array(data,dtype='float32')
+    # if 4 dim, just return the absolute
+    if len(data.shape) == 4:
+        return np.absolute(data)
+    else:
+        data = np.sqrt(np.sum(np.absolute(data)**2,axis=axis))
+        return np.array(data,dtype='float32')
     
