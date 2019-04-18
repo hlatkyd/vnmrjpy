@@ -21,6 +21,7 @@ from . import io
 from . import util
 from . import fit
 from . import func
+from . import sge
 
 # declare for easy testing
 

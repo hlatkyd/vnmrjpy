@@ -39,6 +39,8 @@ def minimize3D(residual, params3D, args3D, mask3D):
             try:
                 out3D[x,y,z] =\
                  minimize(residual, params, args=(xdata,ydata, eps_data))
+            except:
+                pass
     return out3D
 
 def fit3D_leastsq_2stage():

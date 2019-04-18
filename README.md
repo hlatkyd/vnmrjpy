@@ -1,2 +1,5 @@
 Python stuff to work with Vnmrj.
-work-in-progress. be advised: most things are not working properly at this stage
+
+This is a work-in-progress version, most things are not working properly at this stage.
+
+Developmental release is for easier grid engine deployment and testing.
