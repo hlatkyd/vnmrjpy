@@ -12,3 +12,14 @@ test/results/*
 *.swp
 *.pyc
 *.directory
+
+# setup.py workdit
+build
+#
+_build
+
+# setup.py dist directory
+dist
+dist/*
+# egg metadata
+*.egg-info
