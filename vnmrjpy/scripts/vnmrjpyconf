@@ -1,0 +1,6 @@
+#!/usr/bin/bash
+
+MODULE_PATH=`pip3 show vnmrjpy | grep Location`
+MODULE_PATH=${MODULE_PATH:10}/vnmrjpy/config/vnmrjpy.conf
+echo "Opening: $MODULE_PATH"
+vim $MODULE_PATH || vi $MODULE_PATH

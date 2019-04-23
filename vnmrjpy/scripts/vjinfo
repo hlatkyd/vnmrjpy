@@ -1,0 +1,84 @@
+#!/usr/bin/python3
+
+from vnmrjpy.io import FidReader, FdfReader, ProcparReader
+import nibabel as nib
+from argparse import ArgumentParser
+import os
+import glob
+
+"""
+Simple command line tool to print .fid, .fdf, .nii, .nii.gz headers, or procpar
+parameter values to stdout. Recognizes inputs by name only.
+
+Usage:
+
+    $ vjinfo [/path/to/fileORdir]
+    
+    or
+
+    $ vjinfo [/path/to/procparORdir] --par=[parameter name]
+"""
+
+def main():
+
+    parser = ArgumentParser('Get Nifti and Vnmrj datafile header or procpar parameter')
+    parser.add_argument('infile',help='/path/to/file')
+    parser.add_argument('--par',default=None)
+    args = parser.parse_args()
+    (infile, par) = (args.infile, args.par) 
+    
+    # check type of input
+    
+    if infile.endswith('fid') and os.path.isdir(infile):
+        fid = infile+'/fid'
+        procpar = infile+'/procpar'
+        rdr = FidReader(fid,procpar)
+        rdr.read()
+        rdr.print_header()
+        rdr.print_blockheader()
+
+    elif infile.endswith('fid') and not os.path.isdir(infile):
+        fid = infile
+        rdr = FidReader(fid)
+        rdr.read()
+        rdr.print_header()
+        rdr.print_blockheader()
+
+    elif infile.endswith('fdf') and not os.path.isdir(infile):
+        fdf = infile
+        rdr = FdfReader(infile)
+        rdr.read()
+        rdr.print_header()
+    
+    elif infile.endswith('.img') and os.path.isdir(infile):
+        rdr = FdfReader(infile)
+        rdr.read()
+        rdr.print_header()
+        
+
+    elif infile.endswith('.nii') and not os.path.isdir(infile):
+        img = nib.load(infile)
+        header = img.header
+        print(header)
+
+    elif infile.endswith('.nii.gz') and not os.path.isdir(infile):
+        img = nib.load(infile)
+        header = img.header
+        print(header)
+
+    elif infile.endswith('procpar') and not os.path.isdir(infile):
+
+        if par == None:
+            print('Please specify parameter if reading procpar file')
+
+        else:
+            ppdict = ProcparReader(infile).read()
+            try:
+                print('{} = {}'.format(par,ppdict[par]))
+                #print(ppdict[par])
+            except:
+                print('No parameter named "{}" found'.format(par))
+
+if __name__ == '__main__':
+
+    main()

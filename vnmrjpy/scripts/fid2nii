@@ -1,0 +1,53 @@
+#!/usr/bin/python3
+
+import os
+import sys
+import numpy as np
+import nibabel as nib
+from argparse import ArgumentParser
+from shutil import copyfile
+import vnmrjpy as vj
+
+def fid2nii(indir,
+            out=None,
+            saveprocpar=True,
+            save_kspace=False,
+            save_imgspace=True):
+
+    if not os.path.isdir(indir):
+        raise(Exception('Please specify input fid directory'))
+
+    costumout = True
+    if out == None:
+        costumout = False
+        # if output is not given, take fid as basename for new dir
+        out = indir[:-4]+'.nifti/'
+        if not os.path.exists(out):
+            os.makedirs(out)
+
+    procpar = indir + '/procpar'
+    varr = vj.core.read_fid(indir).to_kspace().to_anatomical()
+
+    if save_kspace == True:
+        pass
+
+    if save_imgspace == True:
+        varr.to_imagespace()
+        seqname = indir.rsplit('/',1)[-1][:-3]+'nii'
+        fin_out = out + seqname
+        vj.core.write_nifti(varr, fin_out)
+
+    if saveprocpar == True and costumout == True:
+        copyfile(procpar, out+'/procpar')
+    elif saveprocpar == True and costumout == False:
+        copyfile(procpar, out+'.procpar')
+
+if __name__ == '__main__':
+
+    parser = ArgumentParser()
+    parser.add_argument('fid', help='input fid directory')
+    parser.add_argument('out', help='output basename', nargs='?', default=None)
+    args = parser.parse_args()
+
+    fid2nii(args.fid, args.out)
+
