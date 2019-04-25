@@ -18,13 +18,14 @@ setuptools.setup(
     #packages=setuptools.find_packages(exclude=\
     #['dataset','test','.test.*','*.test.*',\
     #'vnmrsys','vnmrjpy.bin','vnmrjpy.recon','vnmrjpy.io']),
-    packages=['vnmrjpy',
-            'vnmrjpy.core',
-            'vnmrjpy.fit',
-            'vnmrjpy.aloha',
-            'vnmrjpy.config',
-            'vnmrjpy.func',
-            'vnmrjpy.sge',
-            'vnmrjpy.util'],
-    scripts=script_list
+    packages=['vnmrjpy'],
+    include_package_data=True,
+    scripts=script_list,
+    install_requires=[
+        'lmfit',
+        'numpy',
+        'scipy',
+        'matplotlib',
+        'nibabel',
+        ],
 )

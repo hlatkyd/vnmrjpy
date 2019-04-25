@@ -1,8 +1,9 @@
-include LICENSE 
-graft vnmrjpy/doc
-graft vnmrjpy/config
+include LICENSE* README* 
+include vnmrjpy/vnmrjpy.conf
 recursive-exclude test *
 recursive-exclude dataset *
 recursive-exclude vnmrsys *
 recursive-exclude vnmrjpy/recon *
 recursive-exclude vnmrjpy/io *
+recursive-exclude vnmrjpy/doc *
+global-exclude test_*

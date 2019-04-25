@@ -15,11 +15,14 @@ class ConfigParser():
     """
     def __init__(self,configfile=None):
 
+        default_config_path = os.path.dirname(os.path.dirname(\
+                os.path.abspath(__file__)))+'/config'
+
         if configfile == None:
             # search for config file
             for loc in [os.curdir,\
                     os.path.expanduser("~"),\
-                    '/home/david/dev/vnmrjpy/vnmrjpy/config']:
+                    default_config_path]:
                 try:
                     with open(os.path.join(loc,'vnmrjpy.conf')) as conf:
                         self.configfile = os.path.join(loc,'vnmrjpy.conf')
