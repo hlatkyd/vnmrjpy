@@ -1,6 +1,4 @@
-1. CHECK : Mask generation; wrong oputput axes maybe
 5. DO: make aloha tests separate for each sequence
-7. DOING : skipint decoder
 12. DO: consider rp as namedtuple
 15. DO: check ADMM convergence crit
 16. DO: 'k' simple 1d recon for gems

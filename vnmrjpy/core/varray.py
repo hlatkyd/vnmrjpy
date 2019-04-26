@@ -218,6 +218,8 @@ class varray():
             comp_seg = p['cseg']
             altread = p['altread']
             nseg = int(p['nseg'])
+            if nseg != 1:
+                raise(Exception('only single segment implemented yet'))
             etl = int(p['etl'])
             kzero = int(p['kzero'])  
             images = int(p['images'])  # repetitions
@@ -268,7 +270,7 @@ class varray():
                 prekspace = self.data[i*blocks:(i+1)*blocks,...]
                 print('kspace shape in outer {}'.format(prekspace.shape))
 
-                # this case repetiotions are in different blocks
+                # this case repetitions are in different blocks
                 if p['seqcon'] == 'ncnnn':
                 
                     #kspace = np.zeros((rcvrs,etl+pluspe,slices,time,read),\
@@ -309,6 +311,7 @@ class varray():
 
                 # get navigator echo out of data
                 navigators = vj.core.epitools._get_navigator_echo(kspace,p)
+                print('navigator shape {}'.format(navigators.shape))
                 # remove unused echo and navigator, fill rest up with 0
                 kspace = vj.core.epitools._prepare_shape(kspace,p)
                 #kspace = vj.core.epitools._kzero_shift(kspace,p)
@@ -316,15 +319,9 @@ class varray():
 
                 final_kspace[...,i*echo*time:(i+1)*echo*time] = kspace
                 #TODO this is only for testing
-                img = final_kspace[1,:,:,10,3]
-                fft = np.fft.fftshift(img)
-                fft = np.fft.fft2(fft)
-                fft = np.fft.ifftshift(fft)
-                plt.subplot(1,2,1)
-                plt.imshow(np.absolute(img))
-                plt.subplot(1,2,2)
-                plt.imshow(np.absolute(fft))
-                plt.show()
+                vj.core.epitools.epi_debug_plot(kspace, navigators, p)
+                kspace = vj.core.epitools.refcorrect(kspace,p)
+                kspace = vj.core.epitools.navcorrect(kspace, navigators, p)
 
             self.data = final_kspace
             return self
