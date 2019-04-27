@@ -197,7 +197,12 @@ class varray():
                         kspace = c
 
                 final_kspace[...,i*echo*time:(i+1)*echo*time] = kspace
+
             self.data = final_kspace
+            # additional reordering
+            self.data = np.moveaxis(self.data,[0,1,2,3,4],[4,1,0,2,3])
+            # swap axes 0 and 1 so phase, readout etc is the final order
+            self.data = np.swapaxes(self.data,0,1)
             return self
 
         def make_im2Dcs():
@@ -267,6 +272,7 @@ class varray():
 
             for i in range(array_length):
  
+                # arrange to kspace, but don't do corrections
                 prekspace = self.data[i*blocks:(i+1)*blocks,...]
                 print('kspace shape in outer {}'.format(prekspace.shape))
 
@@ -284,11 +290,6 @@ class varray():
                         kspace_t = np.reshape(kspace_t, preshape, order='c')
                         
                         kspace[...,t:t+1,:] = kspace_t
-                        # TODO
-                        # get navigator echoes out
-
-                        # TODO
-                        # navigator correct
                     
                     kspace = np.moveaxis(kspace,[0,1,2,3,4],[0,3,1,4,2])
                     print('kspace shape HERE {}'.format(kspace.shape))
@@ -307,6 +308,7 @@ class varray():
                         c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]
                         kspace = c
 
+
                 # -------------------epi kspace processing---------------------
 
                 # get navigator echo out of data
@@ -316,14 +318,18 @@ class varray():
                 kspace = vj.core.epitools._prepare_shape(kspace,p)
                 #kspace = vj.core.epitools._kzero_shift(kspace,p)
                 kspace = vj.core.epitools._reverse_even(kspace)
-
                 final_kspace[...,i*echo*time:(i+1)*echo*time] = kspace
+
                 #TODO this is only for testing
                 vj.core.epitools.epi_debug_plot(kspace, navigators, p)
                 kspace = vj.core.epitools.refcorrect(kspace,p)
                 kspace = vj.core.epitools.navcorrect(kspace, navigators, p)
 
             self.data = final_kspace
+            # additional reordering
+            self.data = np.moveaxis(self.data,[0,1,2,3,4],[4,1,0,2,3])
+            # swap axes 0 and 1 so phase, readout etc is the final order
+            self.data = np.swapaxes(self.data,0,1)
             return self
 
         def make_im2Depics():
@@ -383,7 +389,12 @@ class varray():
                         kspace = c
             
                 final_kspace[...,i*echo*time:(i+1)*echo*time] = kspace
+
             self.data = final_kspace
+            # additional reordering
+            self.data = np.moveaxis(self.data,[0,1,2,3,4],[4,1,0,2,3])
+            # swap axes 0 and 1 so phase, readout etc is the final order
+            self.data = np.swapaxes(self.data,0,1)
             return self
 
         def make_im2Dfsecs():
@@ -443,6 +454,10 @@ class varray():
                 final_kspace[...,i*echo*time:(i+1)*echo*time] = kspace
 
             self.data = final_kspace
+            # additional reordering
+            self.data = np.moveaxis(self.data,[0,1,2,3,4],[4,1,0,2,3])
+            # swap axes 0 and 1 so phase, readout etc is the final order
+            self.data = np.swapaxes(self.data,0,1)
             
             return self
 
@@ -587,9 +602,10 @@ class varray():
         # old : [rcvrs, phase, read, slice, time]
         # new : [read, phase, slice, time, rcvrs]
 
-        self.data = np.moveaxis(self.data,[0,1,2,3,4],[4,1,0,2,3])
+        # TODO moved these to the individual recons
+        #self.data = np.moveaxis(self.data,[0,1,2,3,4],[4,1,0,2,3])
         # swap axes 0 and 1 so phase, readout etc is the final order
-        self.data = np.swapaxes(self.data,0,1)
+        #self.data = np.swapaxes(self.data,0,1)
         self.vdtype='kspace'
         self.to_local()
 

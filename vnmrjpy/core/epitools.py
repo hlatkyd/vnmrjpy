@@ -58,9 +58,13 @@ def epi_debug_plot(kspace, navigators, p):
     plt.imshow(np.absolute(fftrefs[0]))
     plt.subplot(rows,cols, 1+1+2*cols)
     plt.imshow(np.absolute(fftrefs[1]))
+    plt.subplot(rows,cols, 2+1+2*cols)
+    plt.imshow(np.arctan2(np.imag(fftrefs[0]),np.real(fftrefs[0])))
+    plt.subplot(rows,cols, 3+1+2*cols)
+    plt.imshow(np.arctan2(np.imag(fftrefs[1]),np.real(fftrefs[1])))
     plt.show()
 
-def refcorrect(ksapce, p):
+def refcorrect(kspace, p):
     """Phase correct epi kspace with reference images
     
     Ref paper: van der Zwaag et al: Minimization of Nyquist ghosting for
@@ -71,8 +75,10 @@ def refcorrect(ksapce, p):
     return kspace
 
 def navcorrect(kspace, navigators, p):
-    """Correct kspace data with navigator echo"""
-    #TODO
+    """Correct kspace phase with navigator echo"""
+    
+    # do for each receiver individually
+    #for i in range(kspace.shape[])
     return kspace
 
 def _get_navigator_echo(kspace,pd,phase_dim=1):
