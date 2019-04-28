@@ -266,7 +266,10 @@ class varray():
             
             print('read {}, phase {}, slices {}'.format(read,phase, slices))
             finalshape = (rcvrs, phase, read, slices,echo*time*array_length)
+            navshape = (rcvrs, int(p['nnav']),read,slices,
+                    echo*time*array_length)
             final_kspace = np.zeros(finalshape,dtype='complex64')
+            nav = np.zeros(navshape,dtype='complex64')  #full set of nav echos
             print('fid data shape {}'.format(self.data.shape))
             print('blocks {}'.format(blocks))
 
@@ -319,17 +322,22 @@ class varray():
                 #kspace = vj.core.epitools._kzero_shift(kspace,p)
                 kspace = vj.core.epitools._reverse_even(kspace)
                 final_kspace[...,i*echo*time:(i+1)*echo*time] = kspace
+                nav[...,i*echo*time:(i+1)*echo*time] = navigators
+                
+            # rearranging to default kspace layout here
+            nav = np.moveaxis(nav,[0,1,2,3,4],[4,1,0,2,3])
+            nav = np.swapaxes(nav,0,1)
+            # rearranging to default kspace layout here
+            final_kspace = np.moveaxis(final_kspace,[0,1,2,3,4],[4,1,0,2,3])
+            final_kspace = np.swapaxes(final_kspace,0,1)
+            # ---------------------k-space correction -------------------------
+            #TODO this is only for testing
+            vj.core.epitools.epi_debug_plot(final_kspace, nav, p)
 
-                #TODO this is only for testing
-                vj.core.epitools.epi_debug_plot(kspace, navigators, p)
-                kspace = vj.core.epitools.refcorrect(kspace,p)
-                kspace = vj.core.epitools.navcorrect(kspace, navigators, p)
+            kspace = vj.core.epitools.navcorrect(kspace, nav, p)
+            kspace = vj.core.epitools.refcorrect(kspace,p)
 
             self.data = final_kspace
-            # additional reordering
-            self.data = np.moveaxis(self.data,[0,1,2,3,4],[4,1,0,2,3])
-            # swap axes 0 and 1 so phase, readout etc is the final order
-            self.data = np.swapaxes(self.data,0,1)
             return self
 
         def make_im2Depics():

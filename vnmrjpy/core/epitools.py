@@ -13,19 +13,19 @@ def epi_debug_plot(kspace, navigators, p):
     Kspace is assumed to be pre-corrected
     """
     PLOTCH = 1  # channel to plot
-    PLOTSLC = kspace.shape[3]//2  # plot middle slice
+    PLOTSLC = kspace.shape[2]//2  # plot middle slice
     reftype = p['epiref_type']
     print('navigators shape {}'.format(navigators.shape))
     print('kspace shape in plt {}'.format(kspace.shape))
     # assume first volumes of kspace to be the references
     if reftype == 'triple' or reftype == 'fulltriple':
-        ref1 = kspace[PLOTCH,:,:,PLOTSLC,0]
-        ref2 = kspace[PLOTCH,:,:,PLOTSLC,1]
-        ref3 = kspace[PLOTCH,:,:,PLOTSLC,2]
-        img = kspace[PLOTCH,:,:,PLOTSLC,3]
+        ref1 = kspace[:,:,PLOTSLC,0,PLOTCH]
+        ref2 = kspace[:,:,PLOTSLC,1,PLOTCH]
+        ref3 = kspace[:,:,PLOTSLC,2,PLOTCH]
+        img = kspace[:,:,PLOTSLC,3,PLOTCH]
         imgs = [ref1, ref2, ref3,img]
     elif reftype == 'single':
-        ref1 = kspace[PLOTCH,:,:,PLOTSLC,0]
+        ref1 = kspace[:,:,PLOTSLC,0,PLOTCH]
         refs = [ref1]
 
     testimg = np.ones_like(imgs[0])
@@ -39,7 +39,8 @@ def epi_debug_plot(kspace, navigators, p):
         #im = np.fft.ifft(im, axis=0)
         fftrefs.append(im)
 
-    navs = navigators[PLOTCH,:,:,PLOTSLC,:]
+    print('nav shape {}'.format(navigators.shape))
+    navs = navigators[:,:,PLOTSLC,:,PLOTCH]
 
     rows = 4
     cols = len(imgs)
@@ -70,13 +71,37 @@ def refcorrect(kspace, p):
     Ref paper: van der Zwaag et al: Minimization of Nyquist ghosting for
     Echo-Planar Imaging at Ultra-High fields based on a 'Negative Readout
     Gradient' Strategy, 2009, MRM
+
+    Dimensions are in default space
+    
+    Args:
+        kspace
+        p
     """
     #TODO
     return kspace
 
-def navcorrect(kspace, navigators, p):
-    """Correct kspace phase with navigator echo"""
+def navcorrect(kspace, nav, p, method='default'):
+    """Correct kspace phase with navigator echo
+
+    Both navigator and kspace are in default space
     
+    Args:
+        kspace -- epi ksapce
+        nav -- navigator echo kspace
+        p -- procpar dictionary
+        method -- navigator correction method, default is pointwise
+    Return:
+        kspace -- corrected kspace
+    """
+    if method == 'default':
+        navcorr = vj.config['default']:
+    else:
+        raise(Exception('Not implemented method'))
+
+    if navcorr == 'pointwise':
+
+        pass
     # do for each receiver individually
     #for i in range(kspace.shape[])
     return kspace
