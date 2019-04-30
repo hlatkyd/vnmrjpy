@@ -331,10 +331,11 @@ class varray():
             final_kspace = np.moveaxis(final_kspace,[0,1,2,3,4],[4,1,0,2,3])
             final_kspace = np.swapaxes(final_kspace,0,1)
             # ---------------------k-space correction -------------------------
+            kspace = vj.core.epitools.navcorrect(kspace, nav, p)
+
             #TODO this is only for testing
             vj.core.epitools.epi_debug_plot(final_kspace, nav, p)
 
-            kspace = vj.core.epitools.navcorrect(kspace, nav, p)
             kspace = vj.core.epitools.refcorrect(kspace,p)
 
             self.data = final_kspace

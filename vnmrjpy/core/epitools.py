@@ -62,26 +62,49 @@ def epi_debug_plot(kspace, navigators, p):
     plt.subplot(rows,cols, 2+1+2*cols)
     plt.imshow(np.arctan2(np.imag(fftrefs[0]),np.real(fftrefs[0])))
     plt.subplot(rows,cols, 3+1+2*cols)
-    plt.imshow(np.arctan2(np.imag(fftrefs[1]),np.real(fftrefs[1])))
+    plt.imshow(np.arctan2(np.imag(ref2),np.real(ref2)))
     plt.show()
 
-def refcorrect(kspace, p):
+def refcorrect(kspace, p, method='default'):
     """Phase correct epi kspace with reference images
-    
-    Ref paper: van der Zwaag et al: Minimization of Nyquist ghosting for
+
+    Ref paper:
+    [1] van der Zwaag et al: Minimization of Nyquist ghosting for
     Echo-Planar Imaging at Ultra-High fields based on a 'Negative Readout
     Gradient' Strategy, 2009, MRM
+    [2] Bruder et al: Image Reconstruction for Echo Planar Imaging with
+    Nonequidistant k-Space Sampling, 1990, MRM       
 
-    Dimensions are in default space
+    Dimension layout is in vnmrjpy default space: (read,phase,slice,time,rcvr)
     
     Args:
-        kspace
-        p
+        kspace -- kspace, including reference scans
+        p -- procpar dictionary
+        method -- specificator string, method specified here takes
+                priority over the one in config file
+    Return:
+        kspace -- final corrected kspace 
     """
-    #TODO
+    if method == 'default' and vj.config['epiref'] == 'default':
+        method = p['epiref_type']
+    elif method == 'default':
+        pass
+    else:
+        method = vj.config['epiref']
+    if method == 'none':
+        pass
+    elif method == 'triple':
+        pass
+    elif method == 'fulltriple':
+        pass
+    elif method == 'aloha':
+        raise(Exception('Not implemented'))
+    else:
+        raise(Exception('Incorrect method specification'))
+
     return kspace
 
-def navcorrect(kspace, nav, p, method='default'):
+def navcorrect(kspace, nav, p, method='default',timeavg=False):
     """Correct kspace phase with navigator echo
 
     Both navigator and kspace are in default space
@@ -91,17 +114,32 @@ def navcorrect(kspace, nav, p, method='default'):
         nav -- navigator echo kspace
         p -- procpar dictionary
         method -- navigator correction method, default is pointwise
+        timeavg (boolean) -- If True, an average navigator is created to boost
+                            navigator SNR
     Return:
         kspace -- corrected kspace
     """
+    # get slice dimension
+
+    print('nva in navcorrect {}'.format(nav.shape))
+
     if method == 'default':
-        navcorr = vj.config['default']:
+        navcorr = vj.config['epinav']
     else:
         raise(Exception('Not implemented method'))
 
     if navcorr == 'pointwise':
 
-        pass
+        if timeavg == True:
+
+            for slc in range(kspace.shape[2]):
+                pass
+
+        else:
+            #re = np.real()
+            pass
+            navpshase = np.arctan2(np.imag(nav),np.real(nav))
+                
     # do for each receiver individually
     #for i in range(kspace.shape[])
     return kspace
@@ -123,7 +161,23 @@ def _get_navigator_echo(kspace,pd,phase_dim=1):
         return None
 
 def _prepare_shape(kspace,pd,phase_dim=1):
-    """Remove unused and navigator echo from kspace data"""
+    """Remove unused and navigator echo from kspace data
+    
+    By default, the first echos are navigators, then 1 unused line follows.
+
+    More navigators at the start or end, are not supported, but would be wise
+    to implement sometime
+
+    Args:
+        kspace -- unprepared kspace with unused echo and navigator echos
+        pd -- procpar dictionary
+    Return:
+        kspace -- kspace with echos stripped
+    """
+
+    nnav = int(pd['nnav'])
+    if nnav > 1:
+        raise(Exception('More than 1 navigators are not implemented'))
     if pd['navigator'] == 'y':
         kspace = kspace[:,2:,:,:,:]
     else:
