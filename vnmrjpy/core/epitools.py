@@ -65,6 +65,29 @@ def epi_debug_plot(kspace, navigators, p):
     plt.imshow(np.arctan2(np.imag(ref2),np.real(ref2)))
     plt.show()
 
+def _linear_phase_correction(kspace, ref, p):
+    """Apply linear phase correction
+
+    """
+    pass
+
+def _get_echo_peaks(ref):
+    """Return the echo peaks along RO dimension in k space units
+
+    Args:
+        ref (np.ndarray) -- reference images, same dimensions as kspace
+    Return:
+        peaks -- echo peak indices
+    """
+    return np.argmax(np.absolute(ref),axis=1)
+
+def _get_peak_phase(ref, peaks):
+    """Return phase at echo peaks"""
+
+    phase_full = np.arctan(np.imag(ref),np.real(ref))
+    phase_peaks = phase_full
+    return phase_peaks
+
 def refcorrect(kspace, p, method='default'):
     """Phase correct epi kspace with reference images
 
@@ -85,6 +108,7 @@ def refcorrect(kspace, p, method='default'):
     Return:
         kspace -- final corrected kspace 
     """
+
     if method == 'default' and vj.config['epiref'] == 'default':
         method = p['epiref_type']
     elif method == 'default':
@@ -93,9 +117,14 @@ def refcorrect(kspace, p, method='default'):
         method = vj.config['epiref']
     if method == 'none':
         pass
-    elif method == 'triple':
-        pass
-    elif method == 'fulltriple':
+    elif method == 'triple' or method == 'fulltriple':
+        ref = kspace[...,:3]
+        print('Ref correcting scheme :"triple"')
+        refimg = ref[:,:,10,1,0]
+        peaks = _get_echo_peaks(ref)
+        
+        plt.imshow(np.absolute(refimg),cmap='gray')
+        plt.show()
         pass
     elif method == 'aloha':
         raise(Exception('Not implemented'))

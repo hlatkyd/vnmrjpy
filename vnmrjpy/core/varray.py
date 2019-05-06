@@ -319,7 +319,7 @@ class varray():
                 print('navigator shape {}'.format(navigators.shape))
                 # remove unused echo and navigator, fill rest up with 0
                 kspace = vj.core.epitools._prepare_shape(kspace,p)
-                #kspace = vj.core.epitools._kzero_shift(kspace,p)
+                kspace = vj.core.epitools._kzero_shift(kspace,p)
                 kspace = vj.core.epitools._reverse_even(kspace)
                 final_kspace[...,i*echo*time:(i+1)*echo*time] = kspace
                 nav[...,i*echo*time:(i+1)*echo*time] = navigators
@@ -331,12 +331,14 @@ class varray():
             final_kspace = np.moveaxis(final_kspace,[0,1,2,3,4],[4,1,0,2,3])
             final_kspace = np.swapaxes(final_kspace,0,1)
             # ---------------------k-space correction -------------------------
-            kspace = vj.core.epitools.navcorrect(kspace, nav, p)
+
+            kspace = vj.core.epitools.refcorrect(final_kspace,p)
 
             #TODO this is only for testing
-            vj.core.epitools.epi_debug_plot(final_kspace, nav, p)
+            #vj.core.epitools.epi_debug_plot(final_kspace, nav, p)
 
-            kspace = vj.core.epitools.refcorrect(kspace,p)
+
+            kspace = vj.core.epitools.navcorrect(kspace, nav, p)
 
             self.data = final_kspace
             return self
