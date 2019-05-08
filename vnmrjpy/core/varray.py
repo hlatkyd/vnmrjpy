@@ -97,7 +97,7 @@ class varray():
         """
         return vj.core.transform._to_global(self)
 
-    def to_kspace(self):
+    def to_kspace(self, epiref_type='default'):
         """Build the k-space from the raw fid data and procpar.
 
         Raw fid_data is numpy.ndarray(blocks, traces * np) format. Should be
@@ -129,6 +129,9 @@ class varray():
         vprint('Making k-space for '+ str(self.apptype)+' '\
                 +str(self.pd['seqfil'])+' seqcon: '+str(self.pd['seqcon']))
         rcvrs = self.pd['rcvrs'].count('y')
+
+        # add epiref
+        self.epiref_type = epiref_type
 
         def _is_interleaved(ppdict):
             res  = (int(ppdict['sliceorder']) == 1)
@@ -223,8 +226,8 @@ class varray():
             comp_seg = p['cseg']
             altread = p['altread']
             nseg = int(p['nseg'])
-            if nseg != 1:
-                raise(Exception('only single segment implemented yet'))
+            #if nseg != 1:
+            #    raise(Exception('only single segment implemented yet'))
             etl = int(p['etl'])
             kzero = int(p['kzero'])  
             images = int(p['images'])  # repetitions
@@ -240,6 +243,7 @@ class varray():
             print('nseg {}'.format(nseg))
             print('ns {}'.format(p['ns']))
             print('seqcon {}'.format(p['seqcon']))
+            print('etl {}'.format(etl))
 
             # number of acquisitions based on epi ref.  
             # see manual for explanation
@@ -284,13 +288,20 @@ class varray():
                 
                     #kspace = np.zeros((rcvrs,etl+pluspe,slices,time,read),\
                     #                    dtype='complex64')
-                    kspace = np.zeros((rcvrs,slices,etl+pluspe,time,read),\
+                    kspace = np.zeros((rcvrs,slices,(etl+pluspe)*nseg,time,read),\
                                         dtype='complex64')
                     for t in range(time):
 
                         kspace_t = prekspace[t*rcvrs:(t+1)*rcvrs,...]
-                        preshape = (rcvrs, slices, etl+pluspe, 1, read)
-                        kspace_t = np.reshape(kspace_t, preshape, order='c')
+                        preshape_seg = (rcvrs, slices, (etl+pluspe),nseg, 1, read)
+                        preshape = (rcvrs, slices, (etl+pluspe)*nseg, 1, read)
+                        print('preshape {}'.format(preshape))
+                        #TODO navigator echo correction here maybe?
+                        kspace_t_seg = np.reshape(kspace_t, preshape_seg, order='c')
+                        kspace_t = np.zeros(preshape,dtype='complex64')
+                        #align segments
+                        for i in range(nseg):
+                            kspace_t[:,:,i::nseg,:,:] = kspace_t_seg[:,:,:,i,:,:]
                         
                         kspace[...,t:t+1,:] = kspace_t
                     
@@ -312,35 +323,53 @@ class varray():
                         kspace = c
 
 
-                # -------------------epi kspace processing---------------------
+                # -------------------epi kspace preprocessing------------------
 
                 # get navigator echo out of data
                 navigators = vj.core.epitools._get_navigator_echo(kspace,p)
-                print('navigator shape {}'.format(navigators.shape))
                 # remove unused echo and navigator, fill rest up with 0
                 kspace = vj.core.epitools._prepare_shape(kspace,p)
                 kspace = vj.core.epitools._kzero_shift(kspace,p)
                 kspace = vj.core.epitools._reverse_even(kspace)
                 final_kspace[...,i*echo*time:(i+1)*echo*time] = kspace
                 nav[...,i*echo*time:(i+1)*echo*time] = navigators
-                
+
+            # only work on the full data from now on, so rename it ...
+            kspace = final_kspace    
             # rearranging to default kspace layout here
             nav = np.moveaxis(nav,[0,1,2,3,4],[4,1,0,2,3])
-            nav = np.swapaxes(nav,0,1)
             # rearranging to default kspace layout here
-            final_kspace = np.moveaxis(final_kspace,[0,1,2,3,4],[4,1,0,2,3])
-            final_kspace = np.swapaxes(final_kspace,0,1)
-            # ---------------------k-space correction -------------------------
+            kspace = np.moveaxis(kspace,[0,1,2,3,4],[4,1,0,2,3])
+            #kspace = np.swapaxes(kspace,0,1)
+            # -----------------k-space navigator correction -------------------
 
-            kspace = vj.core.epitools.refcorrect(final_kspace,p)
+            kspace = vj.core.epitools.fliprevro(kspace,p)
+            #TODO  maybe correct with echo first?
+            #kspace = vj.core.epitools.navecho_correct(kspace, p)
 
-            #TODO this is only for testing
-            #vj.core.epitools.epi_debug_plot(final_kspace, nav, p)
+            kspace = vj.core.epitools.navscan_correct(kspace,p)
 
+            # TODO B0 correction needed here??
 
-            kspace = vj.core.epitools.navcorrect(kspace, nav, p)
+            # TODO why is it needed here????
+            kspace = np.swapaxes(kspace,0,1)
+            kspace = np.flip(kspace,axis=1)
 
-            self.data = final_kspace
+            # -----------------k-space additional correction--------------------
+            if self.epiref_type=='default':
+                epiref_type = p['epiref_type']
+            else:
+                epiref_type = self.epiref_type
+        
+            if epiref_type == 'triple':
+                kspace = vj.core.epitools.triple_ref_correct(kspace, p)
+            elif epiref_type == 'fulltriple':
+                kspace = vj.core.epitools.triple_ref_correct(kspace, p)
+            elif epiref_type == 'none':
+                pass
+
+            # --------------------- kspace finished----------------------------
+            self.data = kspace
             return self
 
         def make_im2Depics():
@@ -649,6 +678,10 @@ class varray():
         sa = (ro_dim, pe_dim, pe2_dim)
 
         if seqfil in ['gems', 'fsems', 'mems', 'sems', 'mgems']:
+
+            self.data = vj.core.recon._ifft(self.data,sa[0:2])
+
+        elif seqfil in ['epip','epi']:
 
             self.data = vj.core.recon._ifft(self.data,sa[0:2])
 

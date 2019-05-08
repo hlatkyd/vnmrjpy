@@ -1,102 +1,131 @@
 import vnmrjpy as vj
 import numpy as np
 import matplotlib.pyplot as plt
-
+import copy
 """
 Collection of helper functions for epi and epip k-space formation
 and preprocessing.
 """
 
-def epi_debug_plot(kspace, navigators, p):
-    """Epi plotting utility to see reference scans and navigator echoes
-
-    Kspace is assumed to be pre-corrected
-    """
-    PLOTCH = 1  # channel to plot
-    PLOTSLC = kspace.shape[2]//2  # plot middle slice
-    reftype = p['epiref_type']
-    print('navigators shape {}'.format(navigators.shape))
-    print('kspace shape in plt {}'.format(kspace.shape))
-    # assume first volumes of kspace to be the references
-    if reftype == 'triple' or reftype == 'fulltriple':
-        ref1 = kspace[:,:,PLOTSLC,0,PLOTCH]
-        ref2 = kspace[:,:,PLOTSLC,1,PLOTCH]
-        ref3 = kspace[:,:,PLOTSLC,2,PLOTCH]
-        img = kspace[:,:,PLOTSLC,3,PLOTCH]
-        imgs = [ref1, ref2, ref3,img]
-    elif reftype == 'single':
-        ref1 = kspace[:,:,PLOTSLC,0,PLOTCH]
-        refs = [ref1]
-
-    testimg = np.ones_like(imgs[0])
-    # fft the refs along readout
-    fftrefs = []
-    for i in [ref1, ref2]:
-        #im = np.fft.fftshift(i,axes=1)
-        im = i
-        im = np.fft.ifft(im, axis=1)
-        #im = np.fft.ifftshift(im, axes=1)
-        #im = np.fft.ifft(im, axis=0)
-        fftrefs.append(im)
-
-    print('nav shape {}'.format(navigators.shape))
-    navs = navigators[:,:,PLOTSLC,:,PLOTCH]
-
-    rows = 4
-    cols = len(imgs)
-    # plot individual kspaces of refs
-    fig = plt.figure(figsize=(15,10))
-    for i in range(len(imgs)):
-        # plotting navigators
-        plt.subplot(rows, cols, i+1)
-        plt.imshow(np.absolute(navs[:,:,i]),aspect='auto')
-        # plotting kspace images
-        plt.subplot(rows,cols,i+1+cols)
-        plt.imshow(np.absolute(imgs[i]),cmap='gray')
-    
-    # plotting fftd refs
-    plt.subplot(rows,cols, 0+1+2*cols)
-    plt.imshow(np.absolute(fftrefs[0]))
-    plt.subplot(rows,cols, 1+1+2*cols)
-    plt.imshow(np.absolute(fftrefs[1]))
-    plt.subplot(rows,cols, 2+1+2*cols)
-    plt.imshow(np.arctan2(np.imag(fftrefs[0]),np.real(fftrefs[0])))
-    plt.subplot(rows,cols, 3+1+2*cols)
-    plt.imshow(np.arctan2(np.imag(ref2),np.real(ref2)))
-    plt.show()
-
-def _linear_phase_correction(kspace, ref, p):
-    """Apply linear phase correction
-
-    """
-    pass
-
-def _get_echo_peaks(ref):
-    """Return the echo peaks along RO dimension in k space units
-
-    Args:
-        ref (np.ndarray) -- reference images, same dimensions as kspace
-    Return:
-        peaks -- echo peak indices
-    """
-    return np.argmax(np.absolute(ref),axis=1)
-
-def _get_peak_phase(ref, peaks):
-    """Return phase at echo peaks"""
-
-    phase_full = np.arctan(np.imag(ref),np.real(ref))
-    phase_peaks = phase_full
-    return phase_peaks
-
-def refcorrect(kspace, p, method='default'):
-    """Phase correct epi kspace with reference images
+def triple_ref_correct(kspace, p):
+    """Triple reference corection scheme on kspace
 
     Ref paper:
     [1] van der Zwaag et al: Minimization of Nyquist ghosting for
     Echo-Planar Imaging at Ultra-High fields based on a 'Negative Readout
     Gradient' Strategy, 2009, MRM
-    [2] Bruder et al: Image Reconstruction for Echo Planar Imaging with
+
+    Args:
+        kspace -- navigator corrected kspace
+        p -- procpar dictionary
+    Return:
+        kspace
+    """
+    ref_ind = [i for i,x in enumerate(p['image']) if x == '-1']
+    kspace_ref = kspace[:,:,:,ref_ind,:]
+    if len(ref_ind) != 1:
+        raise(Exception('Triple ref can only handle 1 reference image'))
+    img_ind = [i for i,x in enumerate(p['image']) if x == '1']
+    kspace_img = kspace[:,:,:,img_ind,:]
+    # just add negative RO scans to positive RO scans
+    kspace = kspace_ref + kspace_img
+    return kspace
+
+def fulltriple_ref_correct(kspace, p):
+    """Triple reference corection scheme on kspace
+
+    Ref paper:
+    [1] van der Zwaag et al: Minimization of Nyquist ghosting for
+    Echo-Planar Imaging at Ultra-High fields based on a 'Negative Readout
+    Gradient' Strategy, 2009, MRM
+
+    Args:
+        kspace -- navigator corrected kspace
+        p -- procpar dictionary
+    Return:
+        kspace
+    """
+    ref_ind = [i for i,x in enumerate(p['image']) if x == '-1']
+    kspace_ref = kspace[:,:,:,ref_ind,:]
+    img_ind = [i for i,x in enumerate(p['image']) if x == '1']
+    kspace_img = kspace[:,:,:,img_ind,:]
+    # just add negative RO scans to positive RO scans
+    kspace = kspace_ref + kspace_img
+    return kspace
+
+def fliprevro(kspace, p):
+    """Flip kspace data where readout direction was reversed"""
+
+    ind = [i for i, x in enumerate(p['image']) if x in ['-2','-1']]
+    kspace[:,:,:,ind,:] = np.flip(kspace[:,:,:,ind,:],axis=0)
+    return kspace
+
+def _phasefilter(nav4d, roaxis=0):
+    """Return phase corrected navigator scan"""
+    nav4d = np.fft.fftshift(nav4d,axes=roaxis)
+    nav4d = np.fft.ifft(nav4d,axis=roaxis)
+    phase = np.arctan2(np.imag(nav4d),np.real(nav4d))
+    filt =  np.exp(-1j * phase)
+    return filt
+
+def _mtffilter(nav4d, roaxis=0, echo_average=True):
+    """Return modulation transfer function filter for odd lines"""
+
+    if roaxis !=0:
+        raise(Exception('roaxis !=0 wont work for now....'))
+    # phase correction
+    nav4d = np.fft.fftshift(nav4d,axes=roaxis)
+    nav4d = np.fft.ifft(nav4d,axis=roaxis)
+    phase = np.arctan2(np.imag(nav4d),np.real(nav4d))
+    phase_filt =  np.exp(-1j * phase)
+    filt = nav4d * phase_filt
+    
+    if echo_average == True:
+        # odd line correction with modulation transfer func
+        even = np.mean(filt[:,0::2,:,:],axis=1)
+        odd = np.mean(filt[:,1::2,:,:],axis=1)
+        mtf = np.divide(even,odd,dtype='complex64')
+        mtf = np.expand_dims(mtf,axis=1)
+        mtf = np.repeat(mtf,nav4d.shape[1],axis=1)
+        mtf[:,0::2,:,:] = 1  # even lines should not change
+
+    if echo_average == False:
+        raise(Exception('not implemented yet'))
+
+    return mtf
+
+def _combined_filt(phasefilt, mtffilt, target_shape):
+    """Return final combined filter"""
+    filt = phasefilt * mtffilt
+    slices = target_shape[3] 
+    filt = np.expand_dims(filt,axis=3)
+    filt = np.repeat(filt,slices,axis=3)
+    return filt
+
+def _apply_filter(kspace, filt):
+    """Apply filter to kspace
+
+    Args:
+        kspace (np.ndarray) -- raw preprocesed kspace, excluding reference scans
+        filt (np.ndarray) -- filter to be applied after FFT in RO dimension
+    Return:
+        kspace
+    """
+    kspace_before = copy.copy(kspace)
+    kspace = np.fft.fftshift(kspace,axes=0)
+    kspace = np.fft.ifft(kspace,axis=0)
+    kspace = kspace * filt
+    kspace = np.fft.fft(kspace,axis=0) 
+    kspace = np.fft.fftshift(kspace,axes=(0,1))
+    return kspace 
+
+def navscan_correct(kspace, p, method='default'):
+    """Phase correct epi kspace with reference images
+
+    [1] Bruder et al: Image Reconstruction for Echo Planar Imaging with
     Nonequidistant k-Space Sampling, 1990, MRM       
+    [2] F.Schmitt: Echo-Planar Imaging: Theory, Technique and Application,
+    1998, Springer
 
     Dimension layout is in vnmrjpy default space: (read,phase,slice,time,rcvr)
     
@@ -106,26 +135,70 @@ def refcorrect(kspace, p, method='default'):
         method -- specificator string, method specified here takes
                 priority over the one in config file
     Return:
-        kspace -- final corrected kspace 
+        kspace -- navigator scan corrected kspace 
     """
-
+    # init
     if method == 'default' and vj.config['epiref'] == 'default':
         method = p['epiref_type']
     elif method == 'default':
         pass
     else:
         method = vj.config['epiref']
+    
     if method == 'none':
         pass
+
+    # default vnmrj-like correction
     elif method == 'triple' or method == 'fulltriple':
-        ref = kspace[...,:3]
-        print('Ref correcting scheme :"triple"')
-        refimg = ref[:,:,10,1,0]
-        peaks = _get_echo_peaks(ref)
+
+        # check if data is eligible for this correction
+        if (int(p['image'][0]) != 0 and
+            int(p['image'][1]) != -2):
+            raise(Exception('Navigator scans not found. Quitting.'))
+
+        # phase correction of non-phase-encoded navgator scans
+        ind = p['image'].index('0')
+        stdrofilt = _phasefilter(kspace[:,:,:,ind,:])
+        stdromtffilt = _mtffilter(kspace[:,:,:,ind,:])
+
+        ind = p['image'].index('-2')
+        revrofilt = _phasefilter(kspace[:,:,:,ind,:])
+        revromtffilt = _mtffilter(kspace[:,:,:,ind,:])
+
+        ind = [i for i, x in enumerate(p['image']) if x == '-0']
+        kspace_nav = kspace[:,:,:,ind,:]
+        ind = [i for i, x in enumerate(p['image']) if x == '-2']
+        kspace_revnav = kspace[:,:,:,ind,:]
+        # 'normal' scans are labeled 'image' = 1
+        ind = [i for i, x in enumerate(p['image']) if x == '1']
+        kspace_img = kspace[:,:,:,ind,:]
+        # reversed readout scans are labeled 'image' = -1
+        ind = [i for i, x in enumerate(p['image']) if x == '-1']
+        kspace_ref = kspace[:,:,:,ind,:]
+
+        # creating final image filters
+        stdfilt = _combined_filt(stdrofilt,stdromtffilt,kspace_img.shape)
+        revfilt = _combined_filt(revrofilt,revromtffilt,kspace_ref.shape)
+        # correcting individual images
         
-        plt.imshow(np.absolute(refimg),cmap='gray')
-        plt.show()
-        pass
+        kspace_img = _apply_filter(kspace_img,stdfilt) 
+        kspace_ref = _apply_filter(kspace_ref,revfilt)
+        kspace_nav = _apply_filter(kspace_nav,stdfilt)
+        kspace_revnav = _apply_filter(kspace_revnav,revfilt)
+       
+        # concatenating volumes into the correct series
+
+        ind = [i for i, x in enumerate(p['image']) if x == '-0']
+        kspace[:,:,:,ind,:] = kspace_nav
+        ind = [i for i, x in enumerate(p['image']) if x == '-2']
+        kspace[:,:,:,ind,:] = kspace_revnav
+        # 'normal' scans are labeled 'image' = 1
+        ind = [i for i, x in enumerate(p['image']) if x == '1']
+        kspace[:,:,:,ind,:] = kspace_img
+        # reversed readout scans are labeled 'image' = -1
+        ind = [i for i, x in enumerate(p['image']) if x == '-1']
+        kspace[:,:,:,ind,:] = kspace_ref
+        
     elif method == 'aloha':
         raise(Exception('Not implemented'))
     else:
@@ -133,7 +206,7 @@ def refcorrect(kspace, p, method='default'):
 
     return kspace
 
-def navcorrect(kspace, nav, p, method='default',timeavg=False):
+def navecho_correct(kspace, nav, p, method='default',timeavg=False):
     """Correct kspace phase with navigator echo
 
     Both navigator and kspace are in default space
@@ -150,7 +223,6 @@ def navcorrect(kspace, nav, p, method='default',timeavg=False):
     """
     # get slice dimension
 
-    print('nva in navcorrect {}'.format(nav.shape))
 
     if method == 'default':
         navcorr = vj.config['epinav']
@@ -203,6 +275,7 @@ def _prepare_shape(kspace,pd,phase_dim=1):
     Return:
         kspace -- kspace with echos stripped
     """
+    navind = _get_navigator_echo_index(pd)
 
     nnav = int(pd['nnav'])
     if nnav > 1:
@@ -229,3 +302,14 @@ def _reverse_even(kspace, phase_dim=1):
 
 def _reverse_odd():
     pass
+
+def _get_navigator_echo_index(p):
+    """Return navigator echo positions along PE axis"""
+    
+    # number of navigators
+    nnva = int(p['nnav'])
+    nseg = int(p['nseg'])
+    etl = int(p['etl'])
+
+    pass
+

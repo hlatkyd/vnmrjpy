@@ -9,10 +9,11 @@ class Test_core_to_imagespace(unittest.TestCase):
     def test_gems(self):
 
         seq = glob.glob(vj.config['fids_dir']+'/gems*axial_*')[0]
+        print('Testing {}'.format(seq))
         varr = vj.core.read_fid(seq)
         varr.to_kspace().to_imagespace()
-        #plt.imshow(np.absolute(varr.data[:,:,10,0,1]))
-        #plt.show()
+        plt.imshow(np.absolute(varr.data[:64,:,10,0,1]))
+        plt.show()
         self.assertEqual(varr.vdtype,'imagespace')
 
     def test_ge3d(self):
