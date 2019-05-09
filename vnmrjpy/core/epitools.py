@@ -2,6 +2,7 @@ import vnmrjpy as vj
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
+import warnings
 """
 Collection of helper functions for epi and epip k-space formation
 and preprocessing.
@@ -276,15 +277,11 @@ def _prepare_shape(kspace,pd,phase_dim=1):
         kspace -- kspace with echos stripped
     """
     navind = _get_navigator_echo_index(pd)
-
-    nnav = int(pd['nnav'])
-    if nnav > 1:
-        raise(Exception('More than 1 navigators are not implemented'))
-    if pd['navigator'] == 'y':
-        kspace = kspace[:,2:,:,:,:]
-    else:
-        kspace = kspace[:,1:,:,:,:]
-    return kspace
+    unused = _get_unused_line_index(pd)
+    to_remove = navind + unused
+    remaining_pe = [i for i in range(kspace.shape[1]) if i not in to_remove]
+    
+    return kspace[:,remaining_pe,:,:]
 
 def _kzero_shift(kspace,p,phase_dim=1):
     """Shift data so first echo is at the proper space according to kzero"""
@@ -307,9 +304,29 @@ def _get_navigator_echo_index(p):
     """Return navigator echo positions along PE axis"""
     
     # number of navigators
-    nnva = int(p['nnav'])
+    nnav = int(p['nnav'])
     nseg = int(p['nseg'])
     etl = int(p['etl'])
+    segind = [i for i in range(nnav)]
+    ind = []
+    for i in range(nseg):
+        ind += [j+etl*(i) for j in segind]
+    return ind
 
-    pass
+def _get_unused_line_index(p):
+    """Return unused data position along PE
+
+    In the standard epip (maybe epi as well?) implementation, a data line is
+    acquired after the navigator echo, and before the actual coded pe lines.
+    """
+    if p['seqfil'] in ['epi']:
+        warnings.warn('epi sequence was not checked for unused echo')
+    nnav = int(p['nnav'])
+    nseg = int(p['nseg'])
+    etl = int(p['etl'])
+    segind = [i for i in range(nnav)]
+    ind = []
+    for i in range(nseg):
+        ind.append(nnav + etl * i)
+    return ind
 

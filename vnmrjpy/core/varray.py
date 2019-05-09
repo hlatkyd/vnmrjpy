@@ -270,6 +270,7 @@ class varray():
             
             print('read {}, phase {}, slices {}'.format(read,phase, slices))
             finalshape = (rcvrs, phase, read, slices,echo*time*array_length)
+            print('finalshape {}'.format(finalshape))
             navshape = (rcvrs, int(p['nnav']),read,slices,
                     echo*time*array_length)
             final_kspace = np.zeros(finalshape,dtype='complex64')
@@ -300,11 +301,12 @@ class varray():
                         kspace_t_seg = np.reshape(kspace_t, preshape_seg, order='c')
                         kspace_t = np.zeros(preshape,dtype='complex64')
                         #align segments
-                        for i in range(nseg):
-                            kspace_t[:,:,i::nseg,:,:] = kspace_t_seg[:,:,:,i,:,:]
+                        for j in range(nseg):
+                            kspace_t[:,:,j::nseg,:,:] = kspace_t_seg[:,:,:,j,:,:]
                         
                         kspace[...,t:t+1,:] = kspace_t
                     
+                    #TODO why is it here??? gotta clean it up...
                     kspace = np.moveaxis(kspace,[0,1,2,3,4],[0,3,1,4,2])
                     print('kspace shape HERE {}'.format(kspace.shape))
                 else:
@@ -331,6 +333,10 @@ class varray():
                 kspace = vj.core.epitools._prepare_shape(kspace,p)
                 kspace = vj.core.epitools._kzero_shift(kspace,p)
                 kspace = vj.core.epitools._reverse_even(kspace)
+                print('kspace shape {}'.format(kspace.shape))
+                print('finals_kspace shape {}'.format(final_kspace.shape))
+                print('echo {} time {} i {} '.format(echo,time,i))
+                print('array length {}'.format(array_length))
                 final_kspace[...,i*echo*time:(i+1)*echo*time] = kspace
                 nav[...,i*echo*time:(i+1)*echo*time] = navigators
 
