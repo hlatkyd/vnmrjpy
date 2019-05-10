@@ -9,9 +9,14 @@ vnmrjpy
             recon.py
             niftitools.py
             transform.py
+	    epitools.py
+	    utils.py
+	    fit.py
         func
             composer.py
-        bin
+            wasabi.py
+            base.py
+        scripts
             niview
             
     test

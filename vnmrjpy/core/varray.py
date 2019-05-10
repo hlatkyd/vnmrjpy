@@ -294,7 +294,9 @@ class varray():
                     for t in range(time):
 
                         kspace_t = prekspace[t*rcvrs:(t+1)*rcvrs,...]
-                        preshape_seg = (rcvrs, slices, (etl+pluspe),nseg, 1, read)
+                        preshape_seg = (rcvrs, slices,(etl+pluspe),nseg, 1, read)
+                        #preshape_seg = (rcvrs, nseg, slices,(etl+pluspe), 1, read)
+                        #preshape_seg = (nseg, rcvrs, slices,(etl+pluspe), 1, read)
                         preshape = (rcvrs, slices, (etl+pluspe)*nseg, 1, read)
                         print('preshape {}'.format(preshape))
                         #TODO navigator echo correction here maybe?
@@ -302,9 +304,17 @@ class varray():
                         kspace_t = np.zeros(preshape,dtype='complex64')
                         #align segments
                         for j in range(nseg):
+                            #kspace_t[:,:,j::nseg,:,:] = kspace_t_seg[:,:,j,:,:,:]
                             kspace_t[:,:,j::nseg,:,:] = kspace_t_seg[:,:,:,j,:,:]
-                        
+                            #kspace_t[:,:,j::nseg,:,:] = kspace_t_seg[j,...]
+                            #kspace_t[:,:,j::nseg,:,:] = kspace_t_seg[:,j,...]
+                            print('shape here {}'.format(kspace_t_seg[:,:,:,j,:,:].shape))
+                            plt.imshow(np.absolute(kspace_t_seg[1,10,:,j,0,:]))
+                            plt.show()
                         kspace[...,t:t+1,:] = kspace_t
+
+                    #plt.imshow(np.absolute(kspace[1,10,:,2,:]))
+                    #plt.show()
                     
                     #TODO why is it here??? gotta clean it up...
                     kspace = np.moveaxis(kspace,[0,1,2,3,4],[0,3,1,4,2])
@@ -370,7 +380,7 @@ class varray():
             if epiref_type == 'triple':
                 kspace = vj.core.epitools.triple_ref_correct(kspace, p)
             elif epiref_type == 'fulltriple':
-                kspace = vj.core.epitools.triple_ref_correct(kspace, p)
+                kspace = vj.core.epitools.fulltriple_ref_correct(kspace, p)
             elif epiref_type == 'none':
                 pass
 
