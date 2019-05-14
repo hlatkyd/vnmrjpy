@@ -18,6 +18,6 @@ def mask(varr, threshold=None):
     """ 
     return varr
 
-def average(*varr_list):
-
+def average(*varr_list,method='default'):
+    """Return time averaged vj.varray"""
     pass

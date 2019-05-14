@@ -15,4 +15,4 @@ Includes:
 from .composer import *
 from .wasabi import *
 from .base import *
-
+from .fieldmap import *
