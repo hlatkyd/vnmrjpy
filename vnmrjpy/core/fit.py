@@ -5,21 +5,88 @@ import matplotlib.pyplot as plt
 import itertools
 import vnmrjpy as vj
 
+#TODO abysmal performace. make the result 3d wrapper properly, and
+# everything else along with it...
 """
 Collection of functions aiding the fitting of 3D timeseries data.
-lmfit is the main python module utilized.
+lmfit is the main python module utilized. Most functions here are wrappers
+for lmfit class methods to help deal with independent fitting on 3d dataseries
 """
-#TODO
-# make these more to the point
-def get_params3d(res3d, model, attribute='best_values'):
-    """Extract fit3d result into a list of 3d volumes of parameters
+
+#TODO eval_uncertainty wrapper
+
+#--------------------Wrappers for ModelResult.attributes-----------------------
+
+def get_best_values3d(res3d, model):
+    """Extract fit3d result best_value attribute into a list of 3d volumes
 
     Args:
         res3d -- 3d numpy array of model.ModelResult; output of fit3d
         model -- lmfit Model of the fit
     Return:
-        param3d_list -- 
+        attr3d_list -- list of numpy arrays in same order as model.param_names
     """
+
+    param_names = model.param_names
+    
+    data_type = [type(i) for i in list(res3d[0,0,0].best_values.values())]
+    num = len(param_names)
+    attr3d_list = []
+    shape = res3d.shape
+    # creating empty arrays
+    for i in range(num):
+        arr = np.zeros(shape,dtype=data_type[i])
+        attr3d_list.append(arr)
+    # fill the arrays
+    for x, y, z in itertools.product(*map(range, shape)):
+        vals = list(res3d[x,y,z].best_values.values())
+        for k, attr3d in enumerate(attr3d_list):
+            attr3d[x,y,z] = vals[k]
+            
+    return attr3d_list
+
+def get_best_fit3d(res3d, time_dim):
+    """Extract fit3d result best_fit attribute into a 3d volume of timeseries
+
+    This is the fitted model evaluated on the input grid
+
+    Args:
+        res3d -- 3d numpy array of model.ModelResult; output of fit3d
+        time_dim -- length of time dimension
+    Return:
+        attr3d -- 4d numpy array of best fit data dims: [x,y,z,time]
+    """
+
+    # create empty array 
+    data_type = type(res3d[0,0,0].best_fit[0])
+    shape = list(res3d.shape) + [time_dim]
+    attr3d = np.zeros(shape,dtype=data_type)
+    # fill the arrays
+    for x, y, z in itertools.product(*map(range, shape[0:3])):
+        attr3d[x,y,z,:] = res3d[x,y,z].best_fit
+
+    return attr3d
+
+def get_chisqr3d(res3d):
+    """Extract fit3d result chisqr attribute into a 3d volume
+
+    Args:
+        res3d -- 3d numpy array of model.ModelResult; output of fit3d
+    Return:
+        attr3d -- numpy arrays of chi-square statistics of fit
+    """
+
+    # create empty array 
+    data_type = type(res3d[0,0,0].chisqr)
+    shape = res3d.shape
+    attr3d = np.zeros(shape,dtype=data_type)
+    # fill the arrays
+    for x, y, z in itertools.product(*map(range, shape)):
+        attr3d[x,y,z] = res3d[x,y,z].chisqr
+
+    return attr3d
+
+#-----------------------Wrapper for Model.make_params method-------------------
 
 def make_params3d(model, shape3d, **kwargs):
     """Wrapper for lmfit.Model.make_params() . Return 3d numpy array of Parameters
@@ -37,6 +104,8 @@ def make_params3d(model, shape3d, **kwargs):
     params3d.fill(param1d)
     return params3d
 
+#---------------------------Wrapper for Model.fit()----------------------------
+#TODO this is very inefficient....
 def fit3d(func, y3d, params3d, x3d, method='individual',device='cpu', **kwargs):
     """Perform model fitting on 3D timeseries data with lmfit Model.fit() method
 
@@ -63,71 +132,5 @@ def fit3d(func, y3d, params3d, x3d, method='individual',device='cpu', **kwargs):
         return res3d
 
     elif device == 'sge':
-        raise(Exception('SGE not supported yet'))
 
-#TODO
-# deprecated
-def residual1D(params, model, x_data, y_data, eps_data):
-    """Return residual for least squares fitting
-    
-    Args:
-        params -- lmfit.Parameters
-        model -- callable function of model
-        x_data -- x axis data (as a grid)
-        y_data -- y axis data (as measured on grid)
-        eps_data -- y_data uncertainty
-    Return:
-        residual
-    """
-    model_fit = model(x_data, *par_list)
-    residual =  (y_data - model_fit) / eps_data
-    return residual
-
-#TODO
-#deprecated
-def minimize3D(residual, params3D, args3D, mask3D=None):
-    """Wrapper for lmfit.minimize for 3D timeseries
-
-    Intended behavior is the same, except inputs and outputs are in
-    numpy arrays.
-
-    Args:
-        residual -- residual function for 1D data, callable
-        params3D -- lmfit.Parameters in 3D numpy array
-        args3D -- (x,data, ydata, eps_data) in 3D array
-        mask3D -- 3D np.array of same spatial shape as data
-    Return:
-        out3D -- lmfit.minimize output (MinimizerResults)
-                    in 3D numpy array
-    """
-    (x_dim, y_dim, z_dim) = args3D[1].shape[0:3]
-    out3D = np.zeros((x_dim,y_dim, z_dim))
-    #TODO make zeroed results to same format as nonzero
-    zero_out = 0
-    zero = minimize.MinimizerResults()
-
-    for x, y, z in itertools.product(*map(range, (x_dim,y_dim,z_dim))):
-        if mask3D[x,y,z] == 0:
-            out3D[x,y,z] = zero
-            continue
-        else:
-            (xdata,ydata,eps_data) = args3D[x,y,z]
-            params = params3D[x,y,z]
-            try:
-                out3D[x,y,z] =\
-                 minimize(residual, params, args=(xdata,ydata, eps_data))
-            except:
-                pass
-    return out3D
-#TODO
-# deprecated
-def fit3D_leastsq_2stage():
-
-    pass
-
-#TODO
-# deprecated
-def reinit3D():
-
-    pass
-
+        raise(Exception('SGE support not implemented'))
