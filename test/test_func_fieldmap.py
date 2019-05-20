@@ -7,7 +7,7 @@ from vnmrjpy.func import concatenate
 def load_data():
 
     b0dir = vj.config['dataset_dir'] + '/parameterfit/b0/gems'   
-    seqlist = glob.glob(b0dir+'/gems*')[4:7]
+    seqlist = sorted(glob.glob(b0dir+'/gems*'))[4:7]
     print('\nLoading gems data from: \n')
     for i in seqlist:
         print(i)

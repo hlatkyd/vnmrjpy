@@ -2,6 +2,7 @@ import vnmrjpy as vj
 import numpy as np
 import lmfit
 from vnmrjpy.core.utils import vprint
+import itertools
 """
 Generate fieldmap from a set of gradient echo images
 """
@@ -13,7 +14,7 @@ def _make_grid_x3d(shape3d, gridpoints):
     arr[...] = gridpoints
     return arr
 
-def _make_phase_set(phasedata):
+def _make_phase_set(phasedata, method='triple_echo'):
     """Return all possible phase wrapping combinations
 
     Args:
@@ -21,56 +22,107 @@ def _make_phase_set(phasedata):
     Return:
         phasedata_list -- list of possible phase data in all possible
                                 cases of phase wrapping
+
+    Note: This phase ordering rule is also used in _get_best_fit function
     """
     # only implemented for 3 TE points
     if phasedata.shape[3] != 3:
         raise(Exception('Only the triple echo case is implemented'))
-    
-    p0 = phasedata[...,0,:]
-    p1 = phasedata[...,1,:]
-    p2 = phasedata[...,2,:]
-    #See ref [1] in make_fieldmap()
-    #case 1
-    case1 = phasedata
-    phasedata_list = [case1]
-    #case 2
-    case2 = np.concatenate([p0,p1+2*np.pi,p2+2*np.pi])
-    phasedata_list.append(case2)
-    #case 3
-    case3 = np.concatenate([p0,p1-2*np.pi,p2-2*np.pi])
-    phasedata_list.append(case3)
-    #case 4
-    case4 = np.concatenate([p0,p1,p2+2*np.pi])
-    phasedata_list.append(case4)
-    #case 5
-    case5 = np.concatenate([p0,p1,p2-2*np.pi])
-    phasedata_list.append(case5)
-    #case 6
-    case6 = np.concatenate([p0,p1+2*np.pi,p2])
-    phasedata_list.append(case6)
-    #case 7
-    case7 = np.concatenate([p0,p1-2*np.pi,p2])
-    phasedata_list.append(case7)
-    
-    return phasedata_list
-    
-def _calc_phase_slope(phase_set, te):
-    """Calculate linear regression line slope at each point in 3d phase map
+    if method == 'triple_echo': 
+        p0 = phasedata[...,0,:]
+        p1 = phasedata[...,1,:]
+        p2 = phasedata[...,2,:]
+        #See ref [1] in make_fieldmap()
+        #case 1
+        case1 = phasedata
+        phasedata_list = [case1]
+        #case 2
+        case2 = np.stack([p0,p1+2*np.pi,p2+2*np.pi],axis=3)
+        phasedata_list.append(case2)
+        #case 3
+        case3 = np.stack([p0,p1-2*np.pi,p2-2*np.pi],axis=3)
+        phasedata_list.append(case3)
+        #case 4
+        case4 = np.stack([p0,p1,p2+2*np.pi],axis=3)
+        phasedata_list.append(case4)
+        #case 5
+        case5 = np.stack([p0,p1,p2-2*np.pi],axis=3)
+        phasedata_list.append(case5)
+        #case 6
+        case6 = np.stack([p0,p1+2*np.pi,p2],axis=3)
+        phasedata_list.append(case6)
+        #case 7
+        case7 = np.stack([p0,p1-2*np.pi,p2],axis=3)
+        phasedata_list.append(case7)
+        
+        return phasedata_list
+    else:
+        raise Exception 
 
+def _calc_freq_shift(phase_set, te, method='triple_echo'):
+    """Calculate frequency shift at each point for each phase wrapping scenario
+
+    Do linear regression of the form Phase(TE) = c + d * TE
+
+    Args:
+        phase_set -- list of phase sets in different phase wrapping cases
+        te -- echo times in ms
+    Return:
+        d_set
+        chisqr_set
     """
-    d_set = []
-    te_arr = np.zeros_like(phase_set)
-    te = np.array(te)    
-    te_sum = np.sum(te)
-    te_sqr_sum = np.sum(te)**2 
-    te_sum_sqr = np.sum(te**2)
+    if method == 'triple_echo':
+        d_set = []
+        chisqr_set = []
+        shape = phase_set[0].shape
+        
+        te = np.tile(np.array(te),shape+tuple([1]))
+        te = te.swapaxes(3,5)[...,0]
+        te_sum = np.sum(te,axis=3,keepdims=True)
+        te_sqr_sum = np.sum(te,axis=3,keepdims=True)**2 
+        te_sum_sqr = np.sum(te**2, axis=3,keepdims=True)
 
-    for phase in phase_set:
-        d = phase[]
-        pass
+        for phase in phase_set:
+            
+            # calculate slope
+            d = (np.sum(te * phase, axis=3,keepdims=True) - te_sum *
+                        np.sum(phase,axis=3,keepdims=True) ) / \
+                    (te_sqr_sum - te_sum_sqr)
+            # calculate intercept
+            c = np.mean(phase,axis=3,keepdims=True) - \
+                        d * np.mean(te,axis=3,keepdims=True)
+            # calculate chi-squared
+            chisqr = np.sum((phase - d * te -c)**2,axis=3,keepdims=True)
+            d_set.append(d)
+            chisqr_set.append(chisqr)
 
+        return d_set, chisqr_set
+    else:
+        raise Exception
+
+def _get_original_phase(d,ind,method='triple_echo'):
+    """Return original phase"""
     pass
+def _get_best_fit(d, chisqr, method='triple_echo'):
+    """Find element in d with lowest chisqr at each voxel 
+
+    Args:
+        d
+        chisqr
+    Return:
+        fieldmap
+    """
     
+    shape = chisqr[0].shape
+    fieldmap = np.zeros(shape,dtype='float32')
+    loop_dims = [shape[i] for i in [0,1,2,4]]
+    for x, y, z, rcvr in itertools.product(*map(range,loop_dims)):
+
+        min_chisqr = min(chisq[x,y,z,0,rcvr])
+        fieldmap[x,y,z,0,rcvr] = min_d
+
+    return fieldmap
+
 def make_fieldmap(varr,method='triple_echo'):
     """Generate B0 map from gradient echo images
 
@@ -97,13 +149,18 @@ def make_fieldmap(varr,method='triple_echo'):
         print('timedim {}; te {}'.format(time_dim, te))
         phasedata = np.arctan2(np.imag(varr.data),np.real(varr.data))
         phasedata.astype('float32')
+        print('phasedata shape {}'.format(phasedata.shape))
         phase_set = _make_phase_set(phasedata)
+        print('phaseset shape {}'.format(phase_set[0].shape))
 
-        slope_set = _calc_phase_slope(phase_set, te)
-        print(phase_set[0].shape)
+        d_set, chisqr_set = _calc_freq_shift(phase_set, te)
+        fieldmap = _get_best_fit(d_set, chisqr_set)
 
 
 
+        # TODO deprecated
+        # would be nice if performance was OK
+        # consider namedtuples when saving result object into array
         """
         # create the model and parameter space
         model = lmfit.Model(_linear_func)
