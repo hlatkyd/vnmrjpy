@@ -1,6 +1,8 @@
 import vnmrjpy as vj
 import numpy as np
+from vnmrjpy.core.utils import vprint
 import copy
+import matplotlib.pyplot as plt
 
 """
 Basic functions on varrays.
@@ -21,13 +23,61 @@ def _check_varrlist_integrity(vlist):
             raise(Exception("Data types don't match"))
     return True
 
-def mask(varr, threshold=None):
+def mask(varr, threshold=None, mask_out=True):
     """Create mask on image: set voxel data to 0 where image is below threshold.
 
     Noise threshold is assumed if set to None
 
-    """ 
-    return varr
+    """
+    def _vertical_project(data):
+
+        data = np.mean(data,axis=(0,1))
+        return data    
+
+    def _guess_threshold(vertical_projection):
+
+        # TODO account for noise variance in a more normal way...
+        thresh = 2 * np.min(vertical_projection)
+        return thresh
+
+    # guessing a threshold
+    if threshold == None: 
+        vprint('Making mask, assuming noise to be in the'+
+                'top voxels when determining threshold')
+        orig_space = varr.space
+        varr.to_anatomical()
+        magnitude = vj.core.recon.ssos(varr.data)  # simple combine rcvrs
+        # top down is dim2 backwards
+        vert_proj = _vertical_project(magnitude)
+        vert_min = np.min(vert_proj)
+        vert_max = np.max(vert_proj)
+
+        threshold = _guess_threshold(vert_proj)
+
+    # masking
+    mask = np.zeros_like(varr.data,dtype='float32')
+    mask[np.abs(varr.data) > threshold] = 1.0
+
+    # filling mistakenly masked inner voxels:
+
+    #TODO
+    #mask = _fill_center(mask)
+
+    varr.data = varr.data * mask
+
+    # transform back to original space for consistency
+    if orig_space == 'anatomical':
+        pass
+    elif orig_space == 'local':
+        varr.to_local()
+    elif orig_space == 'global':  # TODO this is not ready though
+        varr.to_global()
+
+    # return results
+    if mask_out:
+        return varr, mask
+    else:
+        return varr
 
 def average(varr_list,method='default', dim='time'):
     """Return time averaged vj.varray"""

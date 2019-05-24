@@ -1,8 +1,12 @@
 import vnmrjpy as vj
 import numpy as np
+from scipy.ndimage.filters import gaussian_filter, median_filter
 import lmfit
 from vnmrjpy.core.utils import vprint
 import itertools
+import matplotlib.pyplot as plt
+import copy
+
 """
 Generate fieldmap from a set of gradient echo images
 """
@@ -23,7 +27,7 @@ def _make_phase_set(phasedata, method='triple_echo'):
         phasedata_list -- list of possible phase data in all possible
                                 cases of phase wrapping
 
-    Note: This phase ordering rule is also used in _get_best_fit function
+    Note: This phase ordering rule is also used in _get_fieldmap function
     """
     # only implemented for 3 TE points
     if phasedata.shape[3] != 3:
@@ -75,55 +79,122 @@ def _calc_freq_shift(phase_set, te, method='triple_echo'):
         d_set = []
         chisqr_set = []
         shape = phase_set[0].shape
-        
+        # getting into sec
+        #te = np.divide(te,1000)
         te = np.tile(np.array(te),shape+tuple([1]))
         te = te.swapaxes(3,5)[...,0]
+        print('te  check {}'.format(te[0,0,0,:,0]))
         te_sum = np.sum(te,axis=3,keepdims=True)
-        te_sqr_sum = np.sum(te,axis=3,keepdims=True)**2 
+        te_sqr_sum = (np.sum(te,axis=3,keepdims=True))**2 
         te_sum_sqr = np.sum(te**2, axis=3,keepdims=True)
 
-        for phase in phase_set:
+        te_mean = np.mean(te, axis=3, keepdims=True)
+
+        for num, phase in enumerate(phase_set):
             
             # calculate slope
+            
+            """
             d = (np.sum(te * phase, axis=3,keepdims=True) - te_sum *
                         np.sum(phase,axis=3,keepdims=True) ) / \
-                    (te_sqr_sum - te_sum_sqr)
+                    (te_sum_sqr - te_sqr_sum)
+
+            
+            """
+            phase_mean = np.mean(phase, axis=3,keepdims=True) 
+            d = np.sum((phase-phase_mean)*(te-te_mean), axis=3,keepdims=True) / \
+                np.sum((te-te_mean)**2, axis=3, keepdims=True)
+
+            
+
             # calculate intercept
             c = np.mean(phase,axis=3,keepdims=True) - \
                         d * np.mean(te,axis=3,keepdims=True)
+            #c = phase_mean - d * te_mean
             # calculate chi-squared
+            print('phase shape here {}'.format(phase.shape))
             chisqr = np.sum((phase - d * te -c)**2,axis=3,keepdims=True)
+            
+            #chisqr = np.sum((phase-(d*te+c)**2/(d*te+c)),axis=3,keepdims=True)
+            #chisqr = np.sum((phase-(d*te+c)**2),axis=3,keepdims=True)
+
+            # hack here: set chisqr high where d is negative
+            chisqr[d < 0] = 10
+
+            # append to list
             d_set.append(d)
             chisqr_set.append(chisqr)
+            
+            # TODO fit check, del this
+            plt.subplot(1,7,num+1)
+            plt.plot(c[45,10,45,:,1] + d[45,10,45,:,1] * te[45,10,45,:,1],color='b')
+            plt.plot(d[45,10,45,:,1] * te[45,10,45,:,1],color='g')
+            plt.plot(phase_set[num][45,10,45,:,1],'ro')
+            plt.title(str(num))
+            plt.ylim((-2*np.pi, 2*np.pi))
+        plt.show()
 
         return d_set, chisqr_set
     else:
         raise Exception
 
-def _get_original_phase(d,ind,method='triple_echo'):
-    """Return original phase"""
-    pass
-def _get_best_fit(d, chisqr, method='triple_echo'):
-    """Find element in d with lowest chisqr at each voxel 
+def _get_indice_map(chisqr_set, method='triple_echo'):
+    """Find element with lowest chisqr at each voxel 
 
     Args:
-        d
-        chisqr
+        chisqr_set
     Return:
-        fieldmap
+        indice_arr
     """
     
-    shape = chisqr[0].shape
-    fieldmap = np.zeros(shape,dtype='float32')
-    loop_dims = [shape[i] for i in [0,1,2,4]]
-    for x, y, z, rcvr in itertools.product(*map(range,loop_dims)):
+    if method == 'triple_echo':
+        
+        #make chisqr array of dims [x,y,z,0,rcvr,chisqr]
+        chisqr_arr = np.stack(chisqr_set,axis=5)
+        indice_arr = np.argmin(chisqr_arr,axis=5)
+        return indice_arr
+    else:
+        raise Exception
 
-        min_chisqr = min(chisq[x,y,z,0,rcvr])
-        fieldmap[x,y,z,0,rcvr] = min_d
+def _get_fieldmap(d_set, indice_arr, method='triple_echo'):
+    """Find best linear fit and return final field map in angular frequency units"""
+    
+    if method == 'triple_echo':
+        d_arr = np.stack(d_set,axis=0)
+        #d_arr = np.moveaxis(d_arr, [5,0,1,2,3,4],[0,1,2,3,4,5])
+        fieldmap = np.choose(indice_arr, d_arr)
+        
+        return fieldmap
+    else:
+        raise Exception
+
+def _median_filter(fieldmap):
+
+    print('fialdmap shape {}'.format(fieldmap.shape))
+    for rcvr in range(fieldmap.shape[4]):
+        arr = copy.copy(fieldmap[...,0,rcvr])
+        fieldmap[...,0,rcvr] = median_filter(arr,size=(3,1,3))
+
+        plt.subplot(1,2,1)
+        plt.imshow(arr[:,10,:])
+        plt.subplot(1,2,2)
+        plt.imshow(fieldmap[:,10,:,0,rcvr])
+        plt.show()
 
     return fieldmap
 
-def make_fieldmap(varr,method='triple_echo'):
+#TODO make filter size based on real voxel size maybe?
+def _gaussian_filter(fieldmap, kernel=2):
+    
+    pass
+
+def _combine_receivers(fieldmap_rcvr, magnitude_rcvr):
+
+    fieldmap = np.sum(fieldmap_rcvr * magnitude_rcvr, axis=4) / \
+                np.sum(magnitude_rcvr,axis=4)
+    return fieldmap
+def make_fieldmap(varr, mask=None, selfmask=True, combine_receivers=True, \
+                    method='triple_echo'):
     """Generate B0 map from gradient echo images
 
     Args:
@@ -141,6 +212,9 @@ def make_fieldmap(varr,method='triple_echo'):
     def _linear_func(x,a,b):
         return a * x + b
     
+    if mask == None and selfmask==True:
+        varr, mask = vj.func.mask(varr, mask_out=True)
+
     if method=='triple_echo':
         # checking for echos
         time_dim = varr.data.shape[3]
@@ -148,13 +222,60 @@ def make_fieldmap(varr,method='triple_echo'):
         te = [float(i)*1000 for i in varr.pd['te']]
         print('timedim {}; te {}'.format(time_dim, te))
         phasedata = np.arctan2(np.imag(varr.data),np.real(varr.data))
+        magnitudedata = np.abs(varr.data)
         phasedata.astype('float32')
         print('phasedata shape {}'.format(phasedata.shape))
-        phase_set = _make_phase_set(phasedata)
+        phase_set = _make_phase_set(phasedata, method=method)
         print('phaseset shape {}'.format(phase_set[0].shape))
 
-        d_set, chisqr_set = _calc_freq_shift(phase_set, te)
-        fieldmap = _get_best_fit(d_set, chisqr_set)
+        d_set, chisqr_set = _calc_freq_shift(phase_set, te, method=method)
+        indice_arr = _get_indice_map(chisqr_set, method=method)
+        fieldmap = _get_fieldmap(d_set, indice_arr, method=method)
+        print(fieldmap.shape)
+        print(mask.shape)
+        if type(mask) != type(None):
+            fieldmap = fieldmap * mask
+        print(fieldmap.shape)
+
+        #fieldmap = _combine_receivers(fieldmap,magnitudedata)
+
+        #fieldmap = _median_filter(fieldmap)
+
+        #fieldmap = _gaussian_filter(fieldmap, kernel=2)
+
+        print('indice arr shape {}'.format(indice_arr.shape))
+
+        plt.subplot(3,4,1)
+        plt.imshow(fieldmap[:,10,:,0,1],cmap='gray',vmin=0,vmax=4)
+        #plt.imshow(fieldmap[:,10,:,0],cmap='gray',vmin=0,vmax=4)
+        plt.subplot(3,4,2)
+        plt.imshow(fieldmap[:,10,:,0,2],cmap='gray',vmin=0,vmax=4)
+        plt.subplot(3,4,3)
+        plt.imshow(indice_arr[:,10,:,0,1],cmap='gray')
+        plt.subplot(3,4,4)
+        plt.imshow(d_set[0][:,10,:,0,1],cmap='gray')
+        plt.subplot(3,4,5)
+        plt.imshow(phasedata[:,10,:,0,1],cmap='gray')
+        plt.subplot(3,4,6)
+        plt.imshow(phasedata[:,10,:,1,1],cmap='gray')
+        plt.subplot(3,4,7)
+        plt.imshow(phasedata[:,10,:,2,1],cmap='gray')
+        plt.subplot(3,4,8)
+        plt.plot(phasedata[45,10,45,:,1])
+        plt.subplot(3,4,9)
+        plt.plot(phase_set[3][45,10,45,:,1])
+        print(phase_set[3][45,10,45,:,1])
+        
+        chilist = [ float(i[45,10,45,:,1]) for i in chisqr_set]
+        dlist = [ float(i[45,10,45,:,1]) for i in d_set]
+        print('chi list')
+        print(chilist)
+        print('d list')
+        print(dlist)
+        print('index in arr {}'.format(indice_arr[45,10,45,0,1]))
+        #print(fieldmap[45,10,45,0,1])
+        print(d_set[3][45,10,45,0,1])
+        plt.show()
 
 
 
