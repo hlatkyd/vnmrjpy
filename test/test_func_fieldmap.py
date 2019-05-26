@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 import glob
 from vnmrjpy.func import concatenate
+from vnmrjpy.core.utils import FitViewer3D
 
 def load_data():
 

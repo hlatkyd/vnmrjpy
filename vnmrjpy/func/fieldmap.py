@@ -6,6 +6,7 @@ from vnmrjpy.core.utils import vprint
 import itertools
 import matplotlib.pyplot as plt
 import copy
+from vnmrjpy.core.utils import FitViewer3D
 
 """
 Generate fieldmap from a set of gradient echo images
@@ -77,6 +78,7 @@ def _calc_freq_shift(phase_set, te, method='triple_echo'):
     """
     if method == 'triple_echo':
         d_set = []
+        c_set = []
         chisqr_set = []
         shape = phase_set[0].shape
         # getting into sec
@@ -123,18 +125,21 @@ def _calc_freq_shift(phase_set, te, method='triple_echo'):
 
             # append to list
             d_set.append(d)
+            c_set.append(c)
             chisqr_set.append(chisqr)
             
             # TODO fit check, del this
+            """
             plt.subplot(1,7,num+1)
             plt.plot(c[45,10,45,:,1] + d[45,10,45,:,1] * te[45,10,45,:,1],color='b')
             plt.plot(d[45,10,45,:,1] * te[45,10,45,:,1],color='g')
             plt.plot(phase_set[num][45,10,45,:,1],'ro')
             plt.title(str(num))
             plt.ylim((-2*np.pi, 2*np.pi))
-        plt.show()
+            """
+        #plt.show()
 
-        return d_set, chisqr_set
+        return d_set, chisqr_set, c_set
     else:
         raise Exception
 
@@ -168,6 +173,12 @@ def _get_fieldmap(d_set, indice_arr, method='triple_echo'):
     else:
         raise Exception
 
+def _get_const(c_set, indice_arr, method='triple_echo'):
+
+    c_arr = np.stack(c_set,axis=0)
+    c_map = np.choose(indice_arr, c_arr)
+    return c_map
+
 def _median_filter(fieldmap):
 
     print('fialdmap shape {}'.format(fieldmap.shape))
@@ -193,6 +204,7 @@ def _combine_receivers(fieldmap_rcvr, magnitude_rcvr):
     fieldmap = np.sum(fieldmap_rcvr * magnitude_rcvr, axis=4) / \
                 np.sum(magnitude_rcvr,axis=4)
     return fieldmap
+
 def make_fieldmap(varr, mask=None, selfmask=True, combine_receivers=True, \
                     method='triple_echo'):
     """Generate B0 map from gradient echo images
@@ -228,14 +240,23 @@ def make_fieldmap(varr, mask=None, selfmask=True, combine_receivers=True, \
         phase_set = _make_phase_set(phasedata, method=method)
         print('phaseset shape {}'.format(phase_set[0].shape))
 
-        d_set, chisqr_set = _calc_freq_shift(phase_set, te, method=method)
+        d_set, chisqr_set, c_set = _calc_freq_shift(phase_set,te,method=method)
         indice_arr = _get_indice_map(chisqr_set, method=method)
         fieldmap = _get_fieldmap(d_set, indice_arr, method=method)
-        print(fieldmap.shape)
-        print(mask.shape)
-        if type(mask) != type(None):
-            fieldmap = fieldmap * mask
-        print(fieldmap.shape)
+        c_map = _get_const(c_set, indice_arr)
+
+
+
+        #if type(mask) != type(None):
+        #    fieldmap = fieldmap * mask
+
+        rcvr = 1
+        model = _linear_func
+        params = [fieldmap[...,rcvr], c_map[...,rcvr]]
+        print('param shape {}, {}'.format(params[0].shape, params[1].shape))
+        print(te)
+        ftv = FitViewer3D(magnitudedata[...,rcvr], te, model, params)
+        ftv.plot()
 
         #fieldmap = _combine_receivers(fieldmap,magnitudedata)
 
@@ -244,7 +265,7 @@ def make_fieldmap(varr, mask=None, selfmask=True, combine_receivers=True, \
         #fieldmap = _gaussian_filter(fieldmap, kernel=2)
 
         print('indice arr shape {}'.format(indice_arr.shape))
-
+        """
         plt.subplot(3,4,1)
         plt.imshow(fieldmap[:,10,:,0,1],cmap='gray',vmin=0,vmax=4)
         #plt.imshow(fieldmap[:,10,:,0],cmap='gray',vmin=0,vmax=4)
@@ -276,7 +297,7 @@ def make_fieldmap(varr, mask=None, selfmask=True, combine_receivers=True, \
         #print(fieldmap[45,10,45,0,1])
         print(d_set[3][45,10,45,0,1])
         plt.show()
-
+        """
 
 
         # TODO deprecated
