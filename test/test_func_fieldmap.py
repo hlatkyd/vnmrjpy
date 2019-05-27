@@ -4,6 +4,8 @@ import numpy as np
 import glob
 from vnmrjpy.func import concatenate
 from vnmrjpy.core.utils import FitViewer3D
+from nibabel.viewers import OrthoSlicer3D
+import copy
 
 def load_data():
 
@@ -24,7 +26,9 @@ def load_data():
 class Test_fieldmap(unittest.TestCase):
 
     varr = load_data()
-    print('load_data check... ')
-    print('varr.pd[te] : {}, varr.data shape {}'.\
-        format(varr.pd['te'], varr.data.shape))
-    b0map = vj.func.make_fieldmap(varr,method='triple_echo')    
+    #varr_02 = copy.copy(varr)
+    fieldmap = vj.func.make_fieldmap(varr,method='triple_echo', selfmask=False)
+    OrthoSlicer3D(fieldmap.data).show()
+    # testing fieldmap with single channel receiver
+    #varr_02.data = varr_02.data[:,:,:,:,:1,...]
+    #fieldmap = vj.func.make_fieldmap(varr_02,method='triple_echo')    

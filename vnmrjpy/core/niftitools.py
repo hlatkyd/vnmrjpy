@@ -4,12 +4,15 @@ import nibabel as nib
 import warnings
 from math import sin, cos
 
-def _set_nifti_header(varr):
+def _set_nifti_header(varr, update=True):
     """Set varray.nifti_header attribute for the current space"""
+    # do nothing if header is already present
+    if type(varr.nifti_header) != type(None) and update == False:
+        return varr
+
     # init empty header
     header = nib.nifti1.Nifti1Header()
     # use qform only
-
     # Transform, so q_affine is diagonal
     if varr.space == 'anatomical':
 
@@ -123,7 +126,6 @@ def _qform_affine(varr,qfac):
         affine[3,3] = 1
     elif varr.space == 'anatomical':
         # make the affine diagonal in this case
-        warnings.warn('Not in local space, affine probably incorrect')
         pixdim = _get_pixdims(varr.pd)
         trans = _get_translations(varr.pd)
         rot = _qform_rot_matrix(varr.pd)

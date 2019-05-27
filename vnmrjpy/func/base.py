@@ -2,6 +2,7 @@ import vnmrjpy as vj
 import numpy as np
 from vnmrjpy.core.utils import vprint
 import copy
+from scipy.ndimage.filters import median_filter
 import matplotlib.pyplot as plt
 
 """
@@ -11,17 +12,6 @@ Includes:
     average
     concatenate 
 """
-
-def _check_varrlist_integrity(vlist):
-    """Return true if shapes and datatypes are the same"""
-    shape = vlist[0].data.shape
-    datatype = vlist[0].data.dtype
-    for v in vlist:
-        if v.data.shape != shape:
-            raise(Exception("Data shapes don't match"))
-        if v.data.dtype != datatype:
-            raise(Exception("Data types don't match"))
-    return True
 
 def mask(varr, threshold=None, mask_out=True):
     """Create mask on image: set voxel data to 0 where image is below threshold.
@@ -59,9 +49,9 @@ def mask(varr, threshold=None, mask_out=True):
     mask[np.abs(varr.data) > threshold] = 1.0
 
     # filling mistakenly masked inner voxels:
-
-    #TODO
-    #mask = _fill_center(mask)
+    mask = median_filter(mask, size=3)
+    # 2nd pass
+    mask = median_filter(mask, size=3)
 
     varr.data = varr.data * mask
 
@@ -123,3 +113,14 @@ def concatenate(varr_list, params=['te'], dim='time'):
     outvarr.pd = newpd
     return outvarr
     
+def _check_varrlist_integrity(vlist):
+    """Return true if shapes and datatypes are the same"""
+    shape = vlist[0].data.shape
+    datatype = vlist[0].data.dtype
+    for v in vlist:
+        if v.data.shape != shape:
+            raise(Exception("Data shapes don't match"))
+        if v.data.dtype != datatype:
+            raise(Exception("Data types don't match"))
+    return True
+

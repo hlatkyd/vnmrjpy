@@ -54,6 +54,8 @@ def loadpd(infile):
 class FitViewer3D():
     """Draw a 3D volume along with regression lines and parameter maps
 
+    Utility tool used for fieldmap, wasabi, etc debugging.
+
     Args:
         image -- 4D or numpy array
         t_axis -- time points in 1D array (the x axis for the 'model')
@@ -65,7 +67,7 @@ class FitViewer3D():
     
     """
 
-    def __init__(self, image, t_axis, model, fit_params):
+    def __init__(self, image, t_axis, model, fit_params, slc_dim=None):
 
         if image.ndim > 4:
             raise Exception
@@ -74,6 +76,12 @@ class FitViewer3D():
         self.params = fit_params
         self.t_axis = t_axis
         self.res = 100  # fitting grid resolution
+        if slc_dim == None:
+            min_dim = min(image.shape[:3])
+            slc_dim = image.shape.index(min_dim)
+
+        self.slc_dim = slc_dim
+        self.aspect = ['auto','auto','auto']            
 
     def plot(self, plot_params=True):
         
@@ -85,14 +93,26 @@ class FitViewer3D():
             ax[0,0].imshow(self.image[:,:,iz,it], cmap='gray')
             ax[0,1].imshow(self.image[:,iy,:,it], cmap='gray')
             ax[0,2].imshow(self.image[ix,:,:,it], cmap='gray')
+            for i in range(3):
+                ax[0,i].set_aspect(self.aspect[i])
 
         def _draw_param_slices():
 
             (ix,iy,iz,it) = self.coords
+            _vmin, _vmax = (0,5)
             for i in range(len(self.params)):
                 ax[1,i].clear()
             for k in range(len(self.params)):
-                ax[1,k].imshow(self.params[k][:,:,iz], cmap='hot')
+                if self.slc_dim == 0:
+                    ax[1,k].imshow(self.params[k][ix,:,:], cmap='hot',\
+                        vmin=_vmin, vmax=_vmax)
+                elif self.slc_dim == 1:
+                    ax[1,k].imshow(self.params[k][:,iy,:], cmap='hot',\
+                        vmin=_vmin, vmax=_vmax)
+                elif self.slc_dim == 2:
+                    ax[1,k].imshow(self.params[k][:,:,iz], cmap='hot',\
+                        vmin=_vmin, vmax=_vmax)
+                ax[1,k].set_aspect('auto')
         #TODO
         def _update_images():
             """Just update data on imshows"""
@@ -105,13 +125,13 @@ class FitViewer3D():
             except: pass
             chcolor = 'green'
             (ix,iy,iz,it) = self.coords
-            vline_01 = ax[0,0].axvline(x=ix,color=chcolor)
-            hline_01 = ax[0,0].axhline(y=iy,color=chcolor)
-            vline_02 = ax[0,1].axvline(x=ix,color=chcolor)
-            hline_02 = ax[0,1].axhline(y=iz,color=chcolor)
-            vline_03 = ax[0,2].axvline(x=iy,color=chcolor)
-            hline_03 = ax[0,2].axhline(y=iz,color=chcolor)
-            vline_04 = ax[0,3].axvline(x=it, color=chcolor)
+            vline_01 = ax[0,0].axvline(x=iy,color=chcolor)
+            hline_01 = ax[0,0].axhline(y=ix,color=chcolor)
+            vline_02 = ax[0,1].axvline(x=iz,color=chcolor)
+            hline_02 = ax[0,1].axhline(y=ix,color=chcolor)
+            vline_03 = ax[0,2].axvline(x=iz,color=chcolor)
+            hline_03 = ax[0,2].axhline(y=iy,color=chcolor)
+            vline_04 = ax[0,3].axvline(x=self.t_axis[it], color=chcolor)
             for i in [vline_01,hline_01,vline_02,hline_02,vline_03,\
                                 hline_03,vline_04]:
                 self.crosshairs.append(i)
@@ -126,21 +146,23 @@ class FitViewer3D():
             # also raw points
             ax[0,3].plot(self.t_axis, self.image[ix,iy,iz,:],'bo')
             ax[0,3].plot(t_grid,best_fit,'r-')
-            ax[0,3].set_aspect('equal')
+            ax[0,3].set_xlim((self.t_axis[0]*0.95,self.t_axis[-1]*1.05))
+            ax[0,3].set_aspect('auto')
 
         def _on_click(event):
 
             if event.inaxes == ax[0,0]:
-                self.coords[0] = event.xdata
-                self.coords[1] = event.ydata
-            elif event.inaxes == ax[0,1]:
-                self.coords[0] = event.xdata
-                self.coords[2] = event.ydata
-            elif event.inaxes == ax[0,2]: 
+                self.coords[0] = event.ydata
                 self.coords[1] = event.xdata
-                self.coords[2] = event.ydata
+            elif event.inaxes == ax[0,1]:
+                self.coords[0] = event.ydata
+                self.coords[2] = event.xdata
+            elif event.inaxes == ax[0,2]: 
+                self.coords[1] = event.ydata
+                self.coords[2] = event.xdata
             elif event.inaxes == ax[0,3]: 
-                self.coords[3] = event.xdata
+                idx = np.abs(self.t_axis-event.xdata).argmin()
+                self.coords[3] = idx
             else:
                 pass
             # reading new coordinates
@@ -152,7 +174,7 @@ class FitViewer3D():
             plt.draw()
 
         # init coordinates
-        self.coords = [0,0,0,0]
+        self.coords = [i//2 for i in self.image.shape[:3]] + [0]
         self.crosshairs = []
 
         param_num = len(self.params)
@@ -165,6 +187,7 @@ class FitViewer3D():
             ax[1,i].axis('off')
         # draw with initial coords 
         _draw_images()
+        _draw_param_slices()
         _draw_crosshairs()
         _draw_best_fit()
 
