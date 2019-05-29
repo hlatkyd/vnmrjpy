@@ -24,6 +24,7 @@ def main():
     parser = ArgumentParser('Get Nifti and Vnmrj datafile header or procpar parameter')
     parser.add_argument('infile',help='/path/to/file')
     parser.add_argument('--par',default=None)
+    parser.add_argument('--blockheader',default=False)
     args = parser.parse_args()
     (infile, par) = (args.infile, args.par) 
     
@@ -35,14 +36,16 @@ def main():
         rdr = FidReader(fid,procpar)
         rdr.read()
         rdr.print_header()
-        rdr.print_blockheader()
+        #if args.blockheader == True:
+        #    rdr.print_blockheader()
 
     elif infile.endswith('fid') and not os.path.isdir(infile):
         fid = infile
         rdr = FidReader(fid)
         rdr.read()
         rdr.print_header()
-        rdr.print_blockheader()
+        #if args.blockheader == True:
+        #    rdr.print_blockheader()
 
     elif infile.endswith('fdf') and not os.path.isdir(infile):
         fdf = infile

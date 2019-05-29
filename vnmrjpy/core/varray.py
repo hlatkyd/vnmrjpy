@@ -28,23 +28,44 @@ class varray():
                 arrayed_params=[None,1], seqcon=None, apptype=None,\
                 vdtype=None, sdims=None, dims=None, description=None):
 
+        # data stored in numpy nd.array
         self.data = data
+        # procpar dictionary
         self.pd = pd
+        # file type varray was made from, eg: fid, fdf, nift
         self.source = source
+        #
         self.intent = intent
+        # coordinate space, anatomical, local, global
         self.space = space
+        # dtype in data
         self.dtype= dtype
+        # varian data type, 'imagespace' or 'kspace' or 'fid'
         self.vdtype = vdtype
+        # if kspace is zerofilled
         self.is_zerofilled = is_zerofilled
+        # if kspace is complete
         self.is_kspace_complete = is_kspace_complete
+        # fid header dictionary if source is fid
         self.fid_header = fid_header
+        # fdf dictionary if source is fdf
         self.fdf_header = fid_header
+        # nifti header, can be constructed almost anytime
         self.nifti_header = nifti_header
+        # which parameters were arrayed "vnmrj style"
         self.arrayed_params = arrayed_params
+        # These are for convenience, can also be found in procpar dict
+        # seqcon parameter
         self.seqcon = seqcon
+        # apptype parameter
         self.apptype = apptype
+        # spatial dimensions
+        # eg.: [read, phase, slice, time, rcvr]
         self.sdims = sdims
+        # gradient coding dimensions
+        # eg.: v.dims = [x,y,z,t,rcvr]
         self.dims = dims
+        # optional string
         self.description = description
     
     def flip_axis(self,axis):
@@ -308,7 +329,8 @@ class varray():
                             kspace_t[:,:,j::nseg,:,:] = kspace_t_seg[:,:,:,j,:,:]
                             #kspace_t[:,:,j::nseg,:,:] = kspace_t_seg[j,...]
                             #kspace_t[:,:,j::nseg,:,:] = kspace_t_seg[:,j,...]
-                            print('shape here {}'.format(kspace_t_seg[:,:,:,j,:,:].shape))
+                            print('shape here {}'.\
+                                        format(kspace_t_seg[:,:,:,j,:,:].shape))
                             plt.imshow(np.absolute(kspace_t_seg[1,10,:,j,0,:]))
                             plt.show()
                         kspace[...,t:t+1,:] = kspace_t

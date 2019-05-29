@@ -13,7 +13,7 @@ Includes:
     concatenate 
 """
 
-def mask(varr, threshold=None, mask_out=True):
+def mask(varr, threshold=None, mask_out=False):
     """Create mask on image: set voxel data to 0 where image is below threshold.
 
     Noise threshold is assumed if set to None
@@ -46,7 +46,7 @@ def mask(varr, threshold=None, mask_out=True):
 
     # masking
     mask = np.zeros_like(varr.data,dtype='float32')
-    mask[np.abs(varr.data) > threshold] = 1.0
+    mask[magnitude > threshold] = 1.0
 
     # filling mistakenly masked inner voxels:
     mask = median_filter(mask, size=3)

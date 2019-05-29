@@ -27,7 +27,7 @@ class Test_fieldmap(unittest.TestCase):
 
     varr = load_data()
     #varr_02 = copy.copy(varr)
-    fieldmap = vj.func.make_fieldmap(varr,method='triple_echo', selfmask=False)
+    fieldmap = vj.func.make_fieldmap(varr,method='triple_echo', selfmask=True)
     OrthoSlicer3D(fieldmap.data).show()
     # testing fieldmap with single channel receiver
     #varr_02.data = varr_02.data[:,:,:,:,:1,...]

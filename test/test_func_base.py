@@ -15,9 +15,6 @@ class Test_base_mask(unittest.TestCase):
         varr.to_anatomical()
         magn = vj.core.recon.ssos(varr.data)
         masked_varr = vj.func.base.mask(varr)
-        print('Mask should be made with BET. Consider this again....')
-        plt.imshow(np.abs(masked_varr.data[:,10,:,0,1]))
-        plt.show()
 
     def test_concatenate(self):
 
