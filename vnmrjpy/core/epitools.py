@@ -8,6 +8,91 @@ Collection of helper functions for epi and epip k-space formation
 and preprocessing.
 """
 
+def _navigator_correct(kspace, npe, etl, method=None):
+    """Basic navigator echo correction with various methods
+
+    Perform navigator echo correction before the segments are merged, and after
+    the readout lines are reversed. 
+
+    Ref [1].: Kim et al.: Fast Interleaved Echo-Planar Imaging with Navigator:
+    High Resolution anatomic and Functional Images at 4T, MRM, 1996
+    ref [2].: O.Heid : Robust EPI Phase Correction, PROC ISMRM, 1997
+
+    Args:
+        kspace -- kspace in numpy.ndarray with dimensions of 
+                        (rcvr,time,slices,nseg,npe,read)
+        npe -- number of readout lines, including navigators
+        etl -- echo train length
+        method -- method specification string, if None it is figured out
+    Return:
+        kspace -- corrected kspace in the same deimnsions
+    """ 
+    # count navigator echos to determine method
+    if type(method) == type(None):
+        nnav = npe-etl-1
+        if nnav == 0:
+            method = 'none'
+        if nnav == 1:
+            method = 'single'
+        if nnav == 2:
+            method = 'dual'
+        if nnav == 3:
+            method = 'triple'
+        elif: raise Exception('Unknown navigator correction scheme')
+    elif method == 'default':
+        method = vj.config['epinav']
+
+    if method == 'none':
+        return kpace    
+
+    if method == 'single':
+
+        #TODO
+        # magnitude correction
+        ro_proj = np.fft.fftshift(kspace[...,nnav,:], axis=-1)
+        ro_proj = np.fft.fft(ro_proj,axis=-1)
+        magn = np.absolute(ro_proj)
+        phase = np.arctan2(np.imag(ro_proj),np.real(ro_proj))
+
+    elif method == 'triple':
+        
+        nav1 = kspace[...,:1,:]
+        nav3 = kspace[...,2:3,:]
+        nav2_p = ( nav1 + nav3 ) / 2
+        nav2_n = kspace[...,1:2,:]
+
+def _arrange_pe(kspace, phase_order):
+    """Rearrange PE dimension to combine segments to be in order"""
+    kspace[:,:,:,np.array(phase_order),:] = copy.copy(kspace)
+    return kspace
+
+def _reverse_even(kspace, read_dim=4, phase_dim=3):
+    """Reverse even echos (0,2,4...)"""
+    kspace[...,0::2,:] = np.flip(kspace[...,0::2,:],axis=read_dim) 
+    return kspace
+
+def _reverse_odd(kspace, read_dim=4, phase_dim=3):
+    """Reverse odd echos (1,3,5...)"""
+    kspace[...,1::2,:] = np.flip(kspace[...,1::2,:],axis=read_dim) 
+    return kspace
+
+def _get_phaseorder_frompar(nseg, npe, etl, kzero):
+    """Return phase reordering indices in a slice"""
+
+    phase_order = []
+    oneshot = [i*nseg for i in range(npe)]
+    for i in range(nseg):
+        phase_order += [j+i for j in oneshot ]
+    
+    return phase_order
+
+#TODO this is for compressed sensing or general>
+def _get_phaseorder_frompetab(petab_file):
+    """Read from file and return phase reordering indices in a slice"""
+    pass
+
+# REDO LEVEL
+#----------------------------------------------------------------
 def triple_ref_correct(kspace, p):
     """Triple reference corection scheme on kspace
 
@@ -32,8 +117,9 @@ def triple_ref_correct(kspace, p):
     kspace = kspace_ref + kspace_img
     return kspace
 
+#TODO
 def fulltriple_ref_correct(kspace, p):
-    """Triple reference corection scheme on kspace
+    """Full triple reference corection scheme on kspace
 
     Ref paper:
     [1] van der Zwaag et al: Minimization of Nyquist ghosting for
@@ -207,45 +293,6 @@ def navscan_correct(kspace, p, method='default'):
 
     return kspace
 
-def navecho_correct(kspace, nav, p, method='default',timeavg=False):
-    """Correct kspace phase with navigator echo
-
-    Both navigator and kspace are in default space
-    
-    Args:
-        kspace -- epi ksapce
-        nav -- navigator echo kspace
-        p -- procpar dictionary
-        method -- navigator correction method, default is pointwise
-        timeavg (boolean) -- If True, an average navigator is created to boost
-                            navigator SNR
-    Return:
-        kspace -- corrected kspace
-    """
-    # get slice dimension
-
-
-    if method == 'default':
-        navcorr = vj.config['epinav']
-    else:
-        raise(Exception('Not implemented method'))
-
-    if navcorr == 'pointwise':
-
-        if timeavg == True:
-
-            for slc in range(kspace.shape[2]):
-                pass
-
-        else:
-            #re = np.real()
-            pass
-            navpshase = np.arctan2(np.imag(nav),np.real(nav))
-                
-    # do for each receiver individually
-    #for i in range(kspace.shape[])
-    return kspace
-
 def _get_navigator_echo(kspace,pd,phase_dim=1):
     """Return navigator echo from full received data"""
 
@@ -289,16 +336,6 @@ def _kzero_shift(kspace,p,phase_dim=1):
     kzero = int(p['kzero'])
     kspace = np.roll(kspace,kzero,axis=phase_dim)
     return kspace
-
-def _reverse_even(kspace, phase_dim=1):
-    """Reverse even echoes"""
-    odd = kspace[:,0::2,...]
-    oddflip = np.flip(odd,axis=2)
-    kspace[:,0::2,...] = oddflip
-    return kspace
-
-def _reverse_odd():
-    pass
 
 def _get_navigator_echo_index(p):
     """Return navigator echo positions along PE axis"""

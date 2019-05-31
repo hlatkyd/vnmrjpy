@@ -1,4 +1,5 @@
 import vnmrjpy as vj
+import copy
 import numpy as np
 from functools import reduce
 from vnmrjpy.core.utils import vprint
@@ -243,44 +244,35 @@ class varray():
         def make_im2Depi():
 
             p = self.pd
-            
-            comp_seg = p['cseg']
-            altread = p['altread']
-            nseg = int(p['nseg'])
-            #if nseg != 1:
-            #    raise(Exception('only single segment implemented yet'))
-            etl = int(p['etl'])
-            kzero = int(p['kzero'])  
-            images = int(p['images'])  # repetitions
-            rcvrs = int(p['rcvrs'].count('y'))
-            echo = 1
-
+            # count navigator echos, also there is a unused one
             if p['navigator'] == 'y':
                 pluspe = 1 + int(p['nnav'])  # navigator echo + unused
             else:
                 pluspe = 1  # unused only
             
-            print('images {}'.format(images))
-            print('nseg {}'.format(nseg))
-            print('ns {}'.format(p['ns']))
-            print('seqcon {}'.format(p['seqcon']))
-            print('etl {}'.format(etl))
+            # init main params
+            # -------------------------------------------------------
+            comp_seg = p['cseg']
+            altread = p['altread']
+            nseg = int(p['nseg'])  # number of segments
+            etl = int(p['etl'])  # echo train length
+            kzero = int(p['kzero'])  
+            images = int(p['images'])  # repetitions
+            rcvrs = int(p['rcvrs'].count('y'))
+            time = len(p['image'])  # total volumes including references
+            npe = etl + pluspe  # total phase encode lines per shot
 
-            # number of acquisitions based on epi ref.  
-            # see manual for explanation
-            epiref = p['epiref_type']
-            if epiref ==  'fulltriple':
-                time = 2 + 2*images
-            elif epiref == 'triple':
-                time = 3+images
-            elif epiref == 'single':
-                time = 1+images
-            elif epiref == 'none':
-                time = images
+            #TODO make petable?
+            if p['petable'] == 'y':
+                petab_file = None #TODO
+                phase_order = vj.core.epitools.\
+                            _get_phaseorder_frompetab(petab_file)
             else:
-                raise(Exception('This type of epiref is not implemented'))
+                phase_order = vj.core.epitools.\
+                            _get_phaseorder_frompar(nseg,npe,etl,kzero)
+
+            # init final shape
             if int(p['pro']) != 0:
-                print('pro not 0')
                 (read, phase, slices) = (int(p['nread']), \
                                             int(p['nphase']), \
                                             int(p['ns']))
@@ -288,62 +280,45 @@ class varray():
                 (read, phase, slices) = (int(p['nread'])//2, \
                                             int(p['nphase']), \
                                             int(p['ns']))
-            
-            print('read {}, phase {}, slices {}'.format(read,phase, slices))
-            finalshape = (rcvrs, phase, read, slices,echo*time*array_length)
-            print('finalshape {}'.format(finalshape))
-            navshape = (rcvrs, int(p['nnav']),read,slices,
-                    echo*time*array_length)
+            finalshape = (rcvrs, phase, read, slices,time*array_length)
             final_kspace = np.zeros(finalshape,dtype='complex64')
-            nav = np.zeros(navshape,dtype='complex64')  #full set of nav echos
-            print('fid data shape {}'.format(self.data.shape))
-            print('blocks {}'.format(blocks))
+            #navshape = (rcvrs, int(p['nnav']),read,slices,
+            #        echo*time*array_length)
+            #nav = np.zeros(navshape,dtype='complex64')  #full set of nav echos
+
+            # sanity check
+            if int(self.fid_header['np']) != int((etl +pluspe)*read*2):
+                raise Exception("np and kspace format doesn't match")
 
             for i in range(array_length):
  
                 # arrange to kspace, but don't do corrections
-                prekspace = self.data[i*blocks:(i+1)*blocks,...]
-                print('kspace shape in outer {}'.format(prekspace.shape))
+                kspace = self.data[i*blocks:(i+1)*blocks,...]
+                print('kspace shape in outer {}'.format(kspace.shape))
 
                 # this case repetitions are in different blocks
                 if p['seqcon'] == 'ncnnn':
                 
-                    #kspace = np.zeros((rcvrs,etl+pluspe,slices,time,read),\
-                    #                    dtype='complex64')
-                    kspace = np.zeros((rcvrs,slices,(etl+pluspe)*nseg,time,read),\
-                                        dtype='complex64')
-                    for t in range(time):
+                    preshape = (rcvrs, time, nseg, slices, npe, read)
+                    kspace = np.reshape(kspace, preshape, order='c')
+                    kspace = np.swapaxes(kspace, 2,3)
+                    # reverse odd readout lines
+                    kspace = vj.core.epitools._reverse_odd(kspace,\
+                                                read_dim=5,phase_dim=4)
+                    # navigator correct
+                    kspace = vj.core.epitools._navigator_correct(kspace,npe,etl)
+                
+                    # start combining segments
+                    preshape = (rcvrs, time, slices, nseg*npe, read)
+                    kspace = np.reshape(kspace, preshape, order='c')
+                    # reorder phase encode lines including kzero shift
+                    kspace = vj.core.epitools._arrange_pe(kspace, phase_order)
 
-                        kspace_t = prekspace[t*rcvrs:(t+1)*rcvrs,...]
-                        preshape_seg = (rcvrs, slices,(etl+pluspe),nseg, 1, read)
-                        #preshape_seg = (rcvrs, nseg, slices,(etl+pluspe), 1, read)
-                        #preshape_seg = (nseg, rcvrs, slices,(etl+pluspe), 1, read)
-                        preshape = (rcvrs, slices, (etl+pluspe)*nseg, 1, read)
-                        print('preshape {}'.format(preshape))
-                        #TODO navigator echo correction here maybe?
-                        kspace_t_seg = np.reshape(kspace_t, preshape_seg, order='c')
-                        kspace_t = np.zeros(preshape,dtype='complex64')
-                        #align segments
-                        for j in range(nseg):
-                            #kspace_t[:,:,j::nseg,:,:] = kspace_t_seg[:,:,j,:,:,:]
-                            kspace_t[:,:,j::nseg,:,:] = kspace_t_seg[:,:,:,j,:,:]
-                            #kspace_t[:,:,j::nseg,:,:] = kspace_t_seg[j,...]
-                            #kspace_t[:,:,j::nseg,:,:] = kspace_t_seg[:,j,...]
-                            print('shape here {}'.\
-                                        format(kspace_t_seg[:,:,:,j,:,:].shape))
-                            plt.imshow(np.absolute(kspace_t_seg[1,10,:,j,0,:]))
-                            plt.show()
-                        kspace[...,t:t+1,:] = kspace_t
-
-                    #plt.imshow(np.absolute(kspace[1,10,:,2,:]))
-                    #plt.show()
-                    
-                    #TODO why is it here??? gotta clean it up...
-                    kspace = np.moveaxis(kspace,[0,1,2,3,4],[0,3,1,4,2])
-                    print('kspace shape HERE {}'.format(kspace.shape))
+                    plt.imshow(np.absolute(kspace[1,0,4,:,:]))
+                    plt.show()
                 else:
                     raise(Exception('This seqcon not implemented in epip'))
-
+                    """
                 if _is_interleaved(p): # 1 if interleaved slices
                     if _is_evenslices(p):
                         c = np.zeros(kspace.shape, dtype='complex64')
@@ -356,9 +331,9 @@ class varray():
                         c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]
                         kspace = c
 
-
+                    """
                 # -------------------epi kspace preprocessing------------------
-
+            """
                 # get navigator echo out of data
                 navigators = vj.core.epitools._get_navigator_echo(kspace,p)
                 # remove unused echo and navigator, fill rest up with 0
@@ -405,7 +380,7 @@ class varray():
                 kspace = vj.core.epitools.fulltriple_ref_correct(kspace, p)
             elif epiref_type == 'none':
                 pass
-
+            """
             # --------------------- kspace finished----------------------------
             self.data = kspace
             return self
