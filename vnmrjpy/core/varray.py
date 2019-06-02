@@ -299,26 +299,43 @@ class varray():
                 # this case repetitions are in different blocks
                 if p['seqcon'] == 'ncnnn':
                 
-                    preshape = (rcvrs, time, nseg, slices, npe, read)
+                    #preshape = (rcvrs, time, nseg, slices, npe, read)
+                    preshape = (time, rcvrs, nseg, slices, npe, read)
                     kspace = np.reshape(kspace, preshape, order='c')
+                    # utility swaps...
                     kspace = np.swapaxes(kspace, 2,3)
+                    kspace = np.swapaxes(kspace, 0,1)
+                    # dims now: [rcvrs,time,nslices, nseg, phase, read]
                     # reverse odd readout lines
                     kspace = vj.core.epitools._reverse_odd(kspace,\
                                                 read_dim=5,phase_dim=4)
+                    # correct reversed echos for main ghost corr
+                    kspace = vj.core.epitools._navigator_scan_correct(kspace,p)
                     # navigator correct
-                    kspace = vj.core.epitools._navigator_correct(kspace,npe,etl)
-                
+                    # this is for intersegment, and additional ghost corr
+                    kspace = vj.core.epitools._navigator_echo_correct(kspace,npe,etl)
+                    # remove navigator echos 
+                    kspace = vj.core.epitools._remove_navigator_echos(kspace,etl)
+                    kspace = vj.core.epitools._zerofill(kspace, phase, nseg)
+                    print('kspace shape here {}'.format(kspace.shape))
                     # start combining segments
-                    preshape = (rcvrs, time, slices, nseg*npe, read)
+                    preshape = (rcvrs, time, slices, nseg*etl, read)
                     kspace = np.reshape(kspace, preshape, order='c')
-                    # reorder phase encode lines including kzero shift
-                    kspace = vj.core.epitools._arrange_pe(kspace, phase_order)
+                    # reorder phase encode lines including kzero shift and
+                    # zerofill
+                    #kspace = vj.core.epitools._arrange_pe(kspace,
+                    #        phase_order_red)
 
-                    plt.imshow(np.absolute(kspace[1,0,4,:,:]))
+                    print('kspace shape after corr {}'.format(kspace.shape))
+                    plt.imshow(np.absolute(kspace[1,1,4,:,:]))
                     plt.show()
+
+                    # final reshape
+                    #TODO
                 else:
                     raise(Exception('This seqcon not implemented in epip'))
-                    """
+                """
+                # reordering interleaved
                 if _is_interleaved(p): # 1 if interleaved slices
                     if _is_evenslices(p):
                         c = np.zeros(kspace.shape, dtype='complex64')
@@ -330,57 +347,8 @@ class varray():
                         c[...,0::2,:] = kspace[...,:(slices+1)//2,:]
                         c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]
                         kspace = c
-
-                    """
+                """
                 # -------------------epi kspace preprocessing------------------
-            """
-                # get navigator echo out of data
-                navigators = vj.core.epitools._get_navigator_echo(kspace,p)
-                # remove unused echo and navigator, fill rest up with 0
-                kspace = vj.core.epitools._prepare_shape(kspace,p)
-                kspace = vj.core.epitools._kzero_shift(kspace,p)
-                kspace = vj.core.epitools._reverse_even(kspace)
-                print('kspace shape {}'.format(kspace.shape))
-                print('finals_kspace shape {}'.format(final_kspace.shape))
-                print('echo {} time {} i {} '.format(echo,time,i))
-                print('array length {}'.format(array_length))
-                final_kspace[...,i*echo*time:(i+1)*echo*time] = kspace
-                nav[...,i*echo*time:(i+1)*echo*time] = navigators
-
-            # only work on the full data from now on, so rename it ...
-            kspace = final_kspace    
-            # rearranging to default kspace layout here
-            nav = np.moveaxis(nav,[0,1,2,3,4],[4,1,0,2,3])
-            # rearranging to default kspace layout here
-            kspace = np.moveaxis(kspace,[0,1,2,3,4],[4,1,0,2,3])
-            #kspace = np.swapaxes(kspace,0,1)
-            # -----------------k-space navigator correction -------------------
-
-            kspace = vj.core.epitools.fliprevro(kspace,p)
-            #TODO  maybe correct with echo first?
-            #kspace = vj.core.epitools.navecho_correct(kspace, p)
-
-            kspace = vj.core.epitools.navscan_correct(kspace,p)
-
-            # TODO B0 correction needed here??
-
-            # TODO why is it needed here????
-            kspace = np.swapaxes(kspace,0,1)
-            kspace = np.flip(kspace,axis=1)
-
-            # -----------------k-space additional correction--------------------
-            if self.epiref_type=='default':
-                epiref_type = p['epiref_type']
-            else:
-                epiref_type = self.epiref_type
-        
-            if epiref_type == 'triple':
-                kspace = vj.core.epitools.triple_ref_correct(kspace, p)
-            elif epiref_type == 'fulltriple':
-                kspace = vj.core.epitools.fulltriple_ref_correct(kspace, p)
-            elif epiref_type == 'none':
-                pass
-            """
             # --------------------- kspace finished----------------------------
             self.data = kspace
             return self
