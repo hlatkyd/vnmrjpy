@@ -132,7 +132,7 @@ def _navigator_echo_correct(kspace, npe, etl, method=None):
         method = vj.config['epinav']
 
     if method == 'none':
-        return kpace    
+        return kspace    
 
     if method == 'single':
         # correct for magnitude offset between segments
@@ -163,7 +163,6 @@ def _navigator_echo_correct(kspace, npe, etl, method=None):
         nav2_p = ( nav1 + nav3 ) / 2
         nav2_n = kspace[...,1:2,:]
         print('Warning, triple echo orr not implemented, doing nothing...')
-
         return kspace
 
 def _remove_navigator_echos(kspace, etl):
@@ -178,19 +177,31 @@ def _zerofill(kspace, phase_dim, nseg):
     add_zeros = np.zeros((shape),dtype=kspace.dtype)
     return np.concatenate([kspace, add_zeros],axis=4)
 
-#TODO
-def _combine_segments_std(kspace, phase, order='linear'):
+def _combine_segments(kspace, pescheme=None):
     """Combine segments in the same manner as vnmrj"""
-    def _get_pe_order(nseg, phase, order='linear'):
+    def _get_pe_order(nseg, pe, order='linear'):
         if order == 'linear':
-            pass
+            phase_order = []
+            oneshot = [i*nseg for i in range(pe)]
+            for i in range(nseg):
+                phase_order += [j+i for j in oneshot]
+            return phase_order
+        #TODO
         elif order == 'centric':
-            pass
-    pre_shape = list(kspace.shape)
-    new_shape = pre_shape[[0,1,2,3,5]]
-    new_shape[3] = phase
-    kspace = np.reshape(kspace, new_shape)
+            raise Exception
+    (rcvrs,time,slc,nseg,pe,read) = kspace.shape
+    new_shape = [rcvrs,time,slc,nseg*pe,read]
+    kspace = np.reshape(kspace, new_shape,order='c')
+    phase_order = _get_pe_order(nseg,pe,order=pescheme)
+    kspace[:,:,:,np.array(phase_order),:] = copy.copy(kspace)
     return kspace
+
+def _reshape_stdepi(kspace):
+    """Reshape to consistent dims after segment combination"""
+    # dims before [rcvrs,time,slices,phase,read]
+    (rcvrs,time,slices,phase,read) = kspace.shape
+    # target dims [read,phase,slice, time, rcvrs]
+    return np.moveaxis(kspace,[4,3,2,1,0],[0,1,2,3,4])
 
 def _arrange_pe(kspace, phase_order):
     """Rearrange PE dimension to combine segments to be in order"""
@@ -217,31 +228,46 @@ def _get_phaseorder_frompar(nseg, npe, etl, kzero):
     
     return phase_order
 
-def _get_navorder_frompar():
-
-    pass
-
-#TODO this is for compressed sensing or general>
 def _get_phaseorder_frompetab(petab_file):
+    #TODO this is for compressed sensing or general>
     """Read from file and return phase reordering indices in a slice"""
     pass
 
-def triple_ref_correct(kspace, p):
-    """Triple reference corection scheme on kspace
+def _refcorrect(kspace, p, method='none'):
+    #TODO additional methods shoudl come here
+    """Additional correction with phase encoded reference scans
+
+    Calls _triple_ref_correct or _fulltriple_ref_correct which are the
+    standard options in Vnmrj.
 
     Ref paper:
     [1] van der Zwaag et al: Minimization of Nyquist ghosting for
     Echo-Planar Imaging at Ultra-High fields based on a 'Negative Readout
     Gradient' Strategy, 2009, MRM
-
+    
     Args:
-        kspace -- navigator corrected kspace
+        kspace -- kspace of dims [read,phase,slices,time,rcvrs]
         p -- procpar dictionary
+        method -- 'none','default','triple','fulltriple'
     Return:
-        kspace
+        kspace -- final version before IFFT with references and navigators
+                 removed
     """
+    print('epiref method {}'.format(method))
+    if method == 'default':
+        method = p['epiref_type']
+    if method == 'none':
+        return kspace
+    elif method == 'triple':
+        kspace = _triple_ref_correct(kspace,p)
+    elif method == 'fulltriple':
+        kspace = _fulltriple_ref_correct(kspace,p)
+    return kspace
+
+def _triple_ref_correct(kspace, p):
+    """Triple reference corection scheme on kspace"""
     ref_ind = [i for i,x in enumerate(p['image']) if x == '-1']
-    kspace_ref = kspace[:,:,:,ref_ind,:]
+    kspace_ref = np.flip(kspace[:,:,:,ref_ind,:],axis=0)
     if len(ref_ind) != 1:
         raise(Exception('Triple ref can only handle 1 reference image'))
     img_ind = [i for i,x in enumerate(p['image']) if x == '1']
@@ -250,23 +276,10 @@ def triple_ref_correct(kspace, p):
     kspace = kspace_ref + kspace_img
     return kspace
 
-#TODO
-def fulltriple_ref_correct(kspace, p):
-    """Full triple reference corection scheme on kspace
-
-    Ref paper:
-    [1] van der Zwaag et al: Minimization of Nyquist ghosting for
-    Echo-Planar Imaging at Ultra-High fields based on a 'Negative Readout
-    Gradient' Strategy, 2009, MRM
-
-    Args:
-        kspace -- navigator corrected kspace
-        p -- procpar dictionary
-    Return:
-        kspace
-    """
+def _fulltriple_ref_correct(kspace, p):
+    """Full triple reference corection scheme on kspace"""
     ref_ind = [i for i,x in enumerate(p['image']) if x == '-1']
-    kspace_ref = kspace[:,:,:,ref_ind,:]
+    kspace_ref = np.flip(kspace[:,:,:,ref_ind,:],axis=0)
     img_ind = [i for i,x in enumerate(p['image']) if x == '1']
     kspace_img = kspace[:,:,:,img_ind,:]
     # just add negative RO scans to positive RO scans
@@ -282,7 +295,7 @@ def _phasefilter(nav):
     filt =  np.exp(-1j * phase)
     return filt
 
-def _mtffilter(nav, echo_average=True):
+def _mtffilter(nav, echo_average=False):
     """Return modulation transfer function filter for odd lines"""
     # phase correction
     nav = np.fft.fftshift(nav,axes=5)
@@ -303,6 +316,7 @@ def _mtffilter(nav, echo_average=True):
         even = filt[...,0:1,:]
         odd = filt[...,1:2,:]
         mtf = np.divide(even,odd,dtype='complex64')
+        mtf[...,0::2,:] = 1  # even lines should not change
     return mtf
 
 def _combined_filt(phasefilt, mtffilt):
@@ -327,3 +341,23 @@ def _apply_filter(kspace, filt):
     kspace = np.fft.fft(kspace,axis=5) 
     kspace = np.fft.fftshift(kspace,axes=(5))
     return kspace 
+
+def _correct_ilepi(kspace, p):
+    """Reorder slices if acquisition was interleaved"""
+    # current shape is [read,phase, slice, time, rcvrs]
+    # if interleaved
+    if int(p['sliceorder']) == 1:
+        # if even slices
+        slices = kspace.shape[2]
+        if int(p['ns']) % 2 == 0:
+            c = np.zeros(kspace.shape,dtype=kspace.dtype)
+            c[...,0::2,:,:] = kspace[...,:slices//2,:,:] 
+            c[...,1::2,:,:] = kspace[...,slices//2:,:,:] 
+            kspace = c
+        else:
+            c[...,0::2,:,:] = kspace[...,:(slices+1)//2,:,:] 
+            c[...,1::2,:,:] = kspace[...,(slices-1)//2+1:,:,:] 
+            kspace = c
+        return kspace
+    else:
+        return kspace

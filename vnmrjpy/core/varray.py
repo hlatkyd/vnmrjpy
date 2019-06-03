@@ -261,7 +261,13 @@ class varray():
             rcvrs = int(p['rcvrs'].count('y'))
             time = len(p['image'])  # total volumes including references
             npe = etl + pluspe  # total phase encode lines per shot
-
+            # getting phase encode scheme
+            if p['pescheme'] == 'l':
+                pescheme = 'linear'
+            elif p['pescheme'] == 'c':
+                pescheme = 'centric'
+            else:
+                pescheme = None
             #TODO make petable?
             if p['petable'] == 'y':
                 petab_file = None #TODO
@@ -280,7 +286,7 @@ class varray():
                 (read, phase, slices) = (int(p['nread'])//2, \
                                             int(p['nphase']), \
                                             int(p['ns']))
-            finalshape = (rcvrs, phase, read, slices,time*array_length)
+            finalshape = (read, phase, slices,time*array_length, rcvrs)
             final_kspace = np.zeros(finalshape,dtype='complex64')
             #navshape = (rcvrs, int(p['nnav']),read,slices,
             #        echo*time*array_length)
@@ -294,7 +300,6 @@ class varray():
  
                 # arrange to kspace, but don't do corrections
                 kspace = self.data[i*blocks:(i+1)*blocks,...]
-                print('kspace shape in outer {}'.format(kspace.shape))
 
                 # this case repetitions are in different blocks
                 if p['seqcon'] == 'ncnnn':
@@ -313,44 +318,27 @@ class varray():
                     kspace = vj.core.epitools._navigator_scan_correct(kspace,p)
                     # navigator correct
                     # this is for intersegment, and additional ghost corr
-                    kspace = vj.core.epitools._navigator_echo_correct(kspace,npe,etl)
+                    kspace = vj.core.epitools.\
+                            _navigator_echo_correct(kspace,npe,etl,method='single')
                     # remove navigator echos 
                     kspace = vj.core.epitools._remove_navigator_echos(kspace,etl)
                     kspace = vj.core.epitools._zerofill(kspace, phase, nseg)
-                    print('kspace shape here {}'.format(kspace.shape))
                     # start combining segments
-                    preshape = (rcvrs, time, slices, nseg*etl, read)
-                    kspace = np.reshape(kspace, preshape, order='c')
-                    # reorder phase encode lines including kzero shift and
-                    # zerofill
-                    #kspace = vj.core.epitools._arrange_pe(kspace,
-                    #        phase_order_red)
+                    kspace = vj.core.epitools._combine_segments(kspace,pescheme)
+                    # reshape to [read,phase,slice,time,rcvrs]
+                    kspace = vj.core.epitools._reshape_stdepi(kspace)
+                    # correct for interleaved slices
+                    kspace = vj.core.epitools._correct_ilepi(kspace,p)
+                    kspace = vj.core.epitools._refcorrect(\
+                                        kspace,p,method=epiref_type)
 
-                    print('kspace shape after corr {}'.format(kspace.shape))
-                    plt.imshow(np.absolute(kspace[1,1,4,:,:]))
-                    plt.show()
-
-                    # final reshape
-                    #TODO
                 else:
                     raise(Exception('This seqcon not implemented in epip'))
-                """
-                # reordering interleaved
-                if _is_interleaved(p): # 1 if interleaved slices
-                    if _is_evenslices(p):
-                        c = np.zeros(kspace.shape, dtype='complex64')
-                        c[...,0::2,:] = kspace[...,:slices//2,:]
-                        c[...,1::2,:] = kspace[...,slices//2:,:]
-                        kspace = c
-                    else:
-                        c = np.zeros(kspace.shape, dtype='complex64')
-                        c[...,0::2,:] = kspace[...,:(slices+1)//2,:]
-                        c[...,1::2,:] = kspace[...,(slices-1)//2+1:,:]
-                        kspace = c
-                """
                 # -------------------epi kspace preprocessing------------------
+                # TODO check 'image' after array merginf
+                final_kspace[...,i*time:(i+1)*time,:] = kspace
             # --------------------- kspace finished----------------------------
-            self.data = kspace
+            self.data = final_kspace
             return self
 
         def make_im2Depics():
