@@ -45,15 +45,15 @@ def _navigator_scan_correct(kspace, p, method='default'):
         if (int(p['image'][0]) != 0 and
             int(p['image'][1]) != -2):
             raise(Exception('Navigator scans not found. Quitting.'))
-
+        shape = kspace.shape
         # phase correction of non-phase-encoded navgator scans
         ind = p['image'].index('0')
-        stdrofilt = _phasefilter(kspace[:,ind:ind+1,...])
-        stdromtffilt = _mtffilter(kspace[:,ind:ind+1,...])
+        stdrofilt = _phasefilter(kspace[:,ind:ind+1,...],shape)
+        stdromtffilt = _mtffilter(kspace[:,ind:ind+1,...],shape)
         # phase ccorrection for reverse-readout navigator scan
         ind = p['image'].index('-2')
-        revrofilt = _phasefilter(kspace[:,ind:ind+1,...])
-        revromtffilt = _mtffilter(kspace[:,ind:ind+1,...])
+        revrofilt = _phasefilter(kspace[:,ind:ind+1,...],shape)
+        revromtffilt = _mtffilter(kspace[:,ind:ind+1,...],shape)
 
         ind = [i for i, x in enumerate(p['image']) if x == '0']
         kspace_nav = kspace[:,ind,...]
@@ -69,6 +69,18 @@ def _navigator_scan_correct(kspace, p, method='default'):
         # creating final image filters
         stdfilt = _combined_filt(stdrofilt,stdromtffilt)
         revfilt = _combined_filt(revrofilt,revromtffilt)
+
+        print('filt shape {}'.format(stdfilt.shape))
+        print('kspace shape {}'.format(kspace.shape))
+        plt.subplot(2,3,1)
+        plt.imshow(np.absolute(stdfilt[1,0,10,0,:,:]))
+        plt.subplot(2,3,2)
+        plt.imshow(np.absolute(stdromtffilt[1,0,10,0,:,:]))
+        plt.subplot(2,3,3)
+        plt.imshow(np.absolute(stdrofilt[1,0,10,0,:,:]))
+        plt.subplot(2,3,4)
+        plt.imshow(np.absolute(kspace[1,3,10,0,:,:]))
+
         # correcting individual images
         kspace_img = _apply_filter(kspace_img,stdfilt) 
         kspace_ref = _apply_filter(kspace_ref,revfilt)
@@ -77,7 +89,7 @@ def _navigator_scan_correct(kspace, p, method='default'):
        
         # concatenating volumes into the correct series
 
-        ind = [i for i, x in enumerate(p['image']) if x == '-0']
+        ind = [i for i, x in enumerate(p['image']) if x == '0']
         kspace[:,ind,...] = kspace_nav
         ind = [i for i, x in enumerate(p['image']) if x == '-2']
         kspace[:,ind,...] = kspace_revnav
@@ -88,6 +100,9 @@ def _navigator_scan_correct(kspace, p, method='default'):
         ind = [i for i, x in enumerate(p['image']) if x == '-1']
         kspace[:,ind,...] = kspace_ref
         
+        plt.subplot(2,3,5)
+        plt.imshow(np.absolute(kspace[1,3,10,0,:,:]))
+        plt.show()
         return kspace
 
     elif method == 'aloha':
@@ -135,9 +150,10 @@ def _navigator_echo_correct(kspace, npe, etl, method=None):
         return kspace    
 
     if method == 'single':
+        shape = kspace.shape
         # correct for magnitude offset between segments
         ro_proj = np.fft.fftshift(kspace, axes=-1)
-        phase_filt = _phasefilter(kspace[...,:1,:])
+        phase_filt = _phasefilter(kspace[...,:1,:],shape)
         ro_proj = np.fft.ifft(ro_proj,axis=-1)
         magn = np.absolute(ro_proj)
         phase = np.arctan2(np.imag(ro_proj),np.real(ro_proj))
@@ -286,8 +302,7 @@ def _fulltriple_ref_correct(kspace, p):
     kspace = kspace_ref + kspace_img
     return kspace
 
-#------------------------------HELPERS-------------------------------------
-def _phasefilter(nav):
+def _phasefilter(nav,shape):
     """Make phase filter from navigator scan"""
     nav = np.fft.fftshift(nav,axes=5)
     nav = np.fft.ifft(nav,axis=5)
@@ -295,7 +310,7 @@ def _phasefilter(nav):
     filt =  np.exp(-1j * phase)
     return filt
 
-def _mtffilter(nav, echo_average=False):
+def _mtffilter(nav,shape,echo_average=False):
     """Return modulation transfer function filter for odd lines"""
     # phase correction
     nav = np.fft.fftshift(nav,axes=5)
@@ -303,20 +318,26 @@ def _mtffilter(nav, echo_average=False):
     phase = np.arctan2(np.imag(nav),np.real(nav))
     phase_filt =  np.exp(-1j * phase)
     filt = nav * phase_filt
+    print(filt.shape)
+    #plt.imshow(np.absolute(filt[1,0,10,0,:,:]))
+    #plt.show()
+    shape = list(shape)
+    shape[1] = 1  # time dim should be 1
+    mtf = np.ones(shape,dtype='complex64')
     if echo_average == True:
         #TODO check: is this viable?
         avgnum = 4  # average only the first 4
         # odd line correction with modulation transfer func
         even = np.mean(filt[...,0:avgnum*2:2,:],axis=4,keepdims=True)
         odd = np.mean(filt[...,1:avgnum*2+1:2,:],axis=4,keepdims=True)
-        mtf = np.divide(even,odd,dtype='complex64')
-        mtf[...,0::2,:] = 1  # even lines should not change
+        mtf_line = np.divide(even,odd,dtype='complex64')
+        mtf[...,1::2,:] = mtf_line  # even lines should not change
     if echo_average == False:
         # use only first 2 echo
         even = filt[...,0:1,:]
         odd = filt[...,1:2,:]
-        mtf = np.divide(even,odd,dtype='complex64')
-        mtf[...,0::2,:] = 1  # even lines should not change
+        mtf_line = np.divide(even,odd,dtype='complex64')
+        mtf[...,1::2,:] = mtf_line  # even lines should not change
     return mtf
 
 def _combined_filt(phasefilt, mtffilt):

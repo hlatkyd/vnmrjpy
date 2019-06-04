@@ -119,13 +119,16 @@ class varray():
         """
         return vj.core.transform._to_global(self)
 
-    def to_kspace(self, epiref_type='default'):
+    def to_kspace(self, raw=False, zerofill=True,
+                    aloha_device='cpu',sge=True,
+                    epiref_type='default',epinav='default'):
         """Build the k-space from the raw fid data and procpar.
 
         Raw fid_data is numpy.ndarray(blocks, traces * np) format. Should be
         untangled based on 'seqcon' or 'seqfil' parameters.
         seqcon chars refer to (echo, slice, Pe1, Pe2, Pe3)
 
+        note:
         PREVIOUS:
                 ([rcvrs, phase, read, slice, echo*time])
         NOW:
@@ -230,7 +233,7 @@ class varray():
             self.data = np.swapaxes(self.data,0,1)
             return self
 
-        def make_im2Dcs():
+        def make_im2Dcs(**kwargs):
             """
             These (*cs) are compressed sensing variants
             """
@@ -241,7 +244,7 @@ class varray():
  
             raise(Exception('not implemented'))
 
-        def make_im2Depi():
+        def make_im2Depi(**kwargs):
 
             p = self.pd
             # count navigator echos, also there is a unused one
@@ -343,7 +346,7 @@ class varray():
 
         def make_im2Depics():
             raise(Exception('not implemented'))
-        def make_im2Dfse():
+        def make_im2Dfse(**kwargs):
 
             p = self.pd
             #petab = vj.util.getpetab(self.procpar,is_procpar=True)
@@ -406,9 +409,9 @@ class varray():
             self.data = np.swapaxes(self.data,0,1)
             return self
 
-        def make_im2Dfsecs():
+        def make_im2Dfsecs(**kwargs):
             raise(Exception('not implemented'))
-        def make_im3D():
+        def make_im3D(**kwargs):
             """Child method of 'make', provides the same as vnmrj im3Drecon"""
             p = self.pd 
             rcvrs = int(p['rcvrs'].count('y'))
