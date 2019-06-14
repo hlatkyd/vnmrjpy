@@ -27,7 +27,8 @@ class varray():
                 is_kspace_complete=False, fid_header=None, fdf_header=None,\
                 nifti_header=None, space=None, intent=None,dtype=None,\
                 arrayed_params=[None,1], seqcon=None, apptype=None,\
-                vdtype=None, sdims=None, dims=None, description=None):
+                vdtype=None, sdims=None, dims=None, description=None,\
+                fid_path=None):
 
         # data stored in numpy nd.array
         self.data = data
@@ -35,7 +36,7 @@ class varray():
         self.pd = pd
         # file type varray was made from, eg: fid, fdf, nift
         self.source = source
-        #
+        #TODO whats this again???
         self.intent = intent
         # coordinate space, anatomical, local, global
         self.space = space
@@ -47,6 +48,8 @@ class varray():
         self.is_zerofilled = is_zerofilled
         # if kspace is complete
         self.is_kspace_complete = is_kspace_complete
+        # path to fid directory
+        self.fid_path = fid_path
         # fid header dictionary if source is fid
         self.fid_header = fid_header
         # fdf dictionary if source is fdf
@@ -120,13 +123,21 @@ class varray():
         return vj.core.transform._to_global(self)
 
     def to_kspace(self, raw=False, zerofill=True,
-                    aloha_device='cpu',sge=True,
+                    method='vnmrjpy',
                     epiref_type='default',epinav='default'):
         """Build the k-space from the raw fid data and procpar.
 
         Raw fid_data is numpy.ndarray(blocks, traces * np) format. Should be
         untangled based on 'seqcon' or 'seqfil' parameters.
         seqcon chars refer to (echo, slice, Pe1, Pe2, Pe3)
+
+        For compatibility, an interface to Xrecon is provided. Set 'method' to 
+        'xrecon'
+        Args:
+            raw
+            zerofill
+            method -- 'xrecon', or 'vnmrjpy'
+
 
         note:
         PREVIOUS:
@@ -551,62 +562,74 @@ class varray():
 
         def make_im3Dute():
             raise(Exception('not implemented')) 
-        # ----------------Handle sequence exceptions first---------------------
-
+        #=========================== Xrecon ===================================
         vprint(' making seqfil : {}'.format(self.pd['seqfil']))
 
+        if method == 'xrecon':
+            vj.xrecon.check_procpar()
+            try:
+                vj.xrecon.call()
+            except:
+                raise Exception('Xrecon could not process fid')
+            vj.xrecon.read_fdf()
+            return self
 
-        if str(self.pd['seqfil']) == 'ge3d_elliptical':
-           
-            self = make_im3Dcs()
+        # ========================= Vnmrjpy recon ============================
+        elif method == 'vnmrjpy':
+            # ----------------Handle sequence exceptions first---------------------
 
-        #--------------------------Handle by apptype---------------------------
 
-        if self.pd['apptype'] == 'im2D':
+            if str(self.pd['seqfil']) == 'ge3d_elliptical':
+               
+                self = make_im3Dcs()
 
-            self = make_im2D()
-            self.is_kspace_complete = True
+            #--------------------------Handle by apptype---------------------------
 
-        elif self.pd['apptype'] == 'im2Dcs':
+            if self.pd['apptype'] == 'im2D':
 
-            self = make_im2Dcs()
+                self = make_im2D()
+                self.is_kspace_complete = True
 
-        elif self.pd['apptype'] == 'im2Depi':
+            elif self.pd['apptype'] == 'im2Dcs':
 
-            self = make_im2Depi()
-            self.is_kspace_complete = True
+                self = make_im2Dcs()
 
-        elif self.pd['apptype'] == 'im2Depics':
+            elif self.pd['apptype'] == 'im2Depi':
 
-            self = make_im2Depics()
+                self = make_im2Depi()
+                self.is_kspace_complete = True
 
-        elif self.pd['apptype'] == 'im2Dfse':
+            elif self.pd['apptype'] == 'im2Depics':
 
-            self = make_im2Dfse()
-            self.is_kspace_complete = True
+                self = make_im2Depics()
 
-        elif self.pd['apptype'] == 'im2Dfsecs':
+            elif self.pd['apptype'] == 'im2Dfse':
 
-            self = make_im2Dfsecs()
+                self = make_im2Dfse()
+                self.is_kspace_complete = True
 
-        elif self.pd['apptype'] == 'im3D':
+            elif self.pd['apptype'] == 'im2Dfsecs':
 
-            self = make_im3D()
-            self.is_kspace_complete = True
+                self = make_im2Dfsecs()
 
-        elif self.pd['apptype'] == 'im3Dcs':
+            elif self.pd['apptype'] == 'im3D':
 
-            self = make_im3Dcs()
+                self = make_im3D()
+                self.is_kspace_complete = True
 
-        elif self.pd['apptype'] == 'im3Dute':
+            elif self.pd['apptype'] == 'im3Dcs':
 
-            self = make_im3Dute()
-            self.is_kspace_complete = True
+                self = make_im3Dcs()
 
-        else:
-            raise(Exception('Could not find apptype. Maybe not implemented?'))
+            elif self.pd['apptype'] == 'im3Dute':
 
-        # ---------------------Global modifications on Kspace------------------
+                self = make_im3Dute()
+                self.is_kspace_complete = True
+
+            else:
+                raise(Exception('Could not find apptype.'))
+
+        # ===================== Global modifications on Kspace ================
 
         #TODO if slices are in reversed order, flip them
         
@@ -628,46 +651,54 @@ class varray():
         
         return self
 
-    def to_imagespace(self):
+    def to_imagespace(self, method='vnmrjpy'):
         """ Reconstruct MR images to real space from k-space.
 
         Generally this is done by fourier transform and corrections.
         Hardcoded for each 'seqfil' sequence.
 
         Args:
-
+            method -- set either 'xrecon' or 'vnmrjpy'
         Updates attributes:
             data
             
 
         """
-        seqfil = str(self.pd['seqfil'])
-        # this is for fftshift
-        ro_dim = self.sdims.index('read')  # this should be default
-        pe_dim = self.sdims.index('phase')  # this should be default
-        pe2_dim = self.sdims.index('slice')  # slice dim is also pe2 dim
+        # ========================== call Xrecon ==============================
+        if method == 'xrecon':
         
-        sa = (ro_dim, pe_dim, pe2_dim)
+            pass
 
-        if seqfil in ['gems', 'fsems', 'mems', 'sems', 'mgems']:
-
-            self.data = vj.core.recon._ifft(self.data,sa[0:2])
-
-        elif seqfil in ['epip','epi']:
-
-            self.data = vj.core.recon._ifft(self.data,sa[0:2])
-
-        elif seqfil in ['ge3d','fsems3d','mge3d']:
+        # =========================== Vnmrjpy custom fft ======================
+        elif method == 'vnmrjpy':
+            seqfil = str(self.pd['seqfil'])
+            # this is for fftshift
+            ro_dim = self.sdims.index('read')  # this should be default
+            pe_dim = self.sdims.index('phase')  # this should be default
+            pe2_dim = self.sdims.index('slice')  # slice dim is also pe2 dim
             
-            self.data = vj.core.recon._ifft(self.data,sa)
+            sa = (ro_dim, pe_dim, pe2_dim)
 
-        elif seqfil in ['ge3d_elliptical']:
+            if seqfil in ['gems', 'fsems', 'mems', 'sems', 'mgems']:
 
-            self.data = vj.core.recon._ifft(self.data,sa)
+                self.data = vj.core.recon._ifft(self.data,sa[0:2])
 
-        else:
-            raise Exception('Sequence reconstruction not implemented yet')
-        
+            elif seqfil in ['epip','epi']:
+
+                self.data = vj.core.recon._ifft(self.data,sa[0:2])
+
+            elif seqfil in ['ge3d','fsems3d','mge3d']:
+                
+                self.data = vj.core.recon._ifft(self.data,sa)
+
+            elif seqfil in ['ge3d_elliptical']:
+
+                self.data = vj.core.recon._ifft(self.data,sa)
+
+            else:
+                raise Exception('Sequence reconstruction not implemented yet')
+
+        # wrapping up
         self.vdtype = 'imagespace'
 
         return self

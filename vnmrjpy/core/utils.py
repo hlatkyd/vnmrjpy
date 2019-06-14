@@ -11,6 +11,7 @@ Functions:
     vprint -- print if verbose is True
     savepd -- save procpar dictionary to json
     loadpd -- load procpar dictionary from json
+    set_procpar -- modify parameter value in procpar file
 
 Classes:
     FitViewer3D -- view 4D volume along with best fit on time axis
@@ -29,6 +30,73 @@ def vprint(string):
 def getpetab(pd):
 
     pass 
+
+def set_procpar(path, par, val):
+    """Rewrite procpar parameter in file to the desired value
+
+    Args:
+        path -- path to .fid direcory od procpar file
+        par -- parameter name, can be a list
+        val -- desired value, format should be correct, can be a list
+    Return:
+        None
+    """
+    # sanity check for list lengths
+    if type(par) == list:
+        if type(val) != list:
+            raise Exception
+        if len(par) != len(val):
+            raise Exception
+    else:
+        par = [par]
+        val = [val]
+    par = [str(i) for i in par]
+    val = [str(i) for i]
+    if path[-4:] == '.fid':  # path was fid directory
+        ppfile = path+'/procpar'
+    elif path[-7:] == 'procpar':
+        ppfile = path
+    # save file permissions
+    stat = os.stat(ppfile)
+    uid, gid = stat[4], stat[5]
+
+    # reading file
+    line_nums = []  # list of line numbers where pars appear
+    par_order = []  # order in which the pars appear in file
+    val_order = []
+    with open(ppfile,'r') as openpp:
+        lines = openpp.readlines()
+        for num, line in enumerate(lines):
+            if line.startswith(tuple(par)):
+                # which par; also, does this make sense?
+                for i in par:
+                    if line.startswith(i):
+                        curpar = i
+                        curval = par.index(i)
+                line_nums.append(num)
+                par_order.append(curpar)
+                val_order.append(curval)
+    print(par_order)
+    print(line_nums)             
+    # change lines
+    for num, line in enumerate(lines):
+        if num in line_nums:
+            if lines[num+1].startswith('1'):
+                print(num)
+                print(lines[num+1])
+                # check value type
+                ind = line_nums.index(num)
+                lines[num+1] = '1 '+val_order[ind]
+            else:
+                raise Exception('Unexpected start of line '+str(num+1))
+
+    # writing file
+    newppfile = ppfile.rsplit('/',1)[0]+'/test' 
+    with open(newppfile,'w') as openpp:
+        openpp.writelines(lines)
+    # restore permissions
+    os.chown(newppfile, uid ,gid)
+    
 
 def savepd(pd,out):
     """Save procpar dictionary to json file"""

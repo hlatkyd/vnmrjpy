@@ -91,8 +91,13 @@ def read_procpar(procpar):
 
     return dict(zip(name, value))
 
-def read_fid(fid,procpar=None):
+def read_fid(fid,procpar=None,load_data=True):
     """Handles raw data from Varian spectrometer
+
+    Args:
+        fid -- path to .fid directory
+        procpar -- path to procpar file, specify procpar manually
+        load_data -- set false to prevent loading binary data into memory
 
     .fid File structure as per Vnmrj manual:
     ===================================
@@ -173,12 +178,15 @@ def read_fid(fid,procpar=None):
             yield l[i:i + n]
 
     # init
+    # TODO is procpar != None making sense?
     if procpar==None:
     
         if os.path.isdir(fid):
+            fid_path = fid
             procpar = str(fid)+'/procpar'
             fid = str(fid)+'/fid'
         else:
+            fid_path = fid.rsplit('/',1)[0]
             procpar = fid.rsplit('/')[0]+'/procpar'
 
     # header data should be 32 bytes
@@ -205,17 +213,20 @@ def read_fid(fid,procpar=None):
 
     #------------main iteration through bytearray -----------------
 
-    dim = (int(header_dict['nblocks']),\
-            int((header_dict['ntraces'])*int(header_dict['np'])))
-    fid_data = np.empty(dim)
-    if header_dict['ebytes'] == 4:
-        dt = '>f'
-    if header_dict['ebytes'] == 2:
-        dt = '>i2'
-    for k,block in enumerate(block_list): # for each block
-        block_header = block[:28] # separate block header
-        block_data = block[28:]
-        fid_data[k,:] = np.frombuffer(bytearray(block_data),dt)
+    if load_data == False:
+        fid_data = None  #don't load fid data, useful if xrecon is called next
+    elif load_data == True:
+        dim = (int(header_dict['nblocks']),\
+                int((header_dict['ntraces'])*int(header_dict['np'])))
+        fid_data = np.empty(dim)
+        if header_dict['ebytes'] == 4:
+            dt = '>f'
+        if header_dict['ebytes'] == 2:
+            dt = '>i2'
+        for k,block in enumerate(block_list): # for each block
+            block_header = block[:28] # separate block header
+            block_data = block[28:]
+            fid_data[k,:] = np.frombuffer(bytearray(block_data),dt)
 
     # fid data ready, now create varray class
     arr = _get_arrayed_par_length(pd)
@@ -223,7 +234,7 @@ def read_fid(fid,procpar=None):
     return  vj.varray(data=fid_data,space=None,pd=pd,fid_header=header_dict,\
                         source='fid',dtype=vj.DTYPE, seqcon=pd['seqcon'],\
                         apptype=pd['apptype'],arrayed_params=arr,vdtype='fid',\
-                        sdims = sdim)
+                        sdims = sdim, fid_path=fid_path)
 
 def read_fdf(path):
     """Return vnmrjpy.varray from varian .fdf files

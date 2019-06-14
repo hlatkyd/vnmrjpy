@@ -11,6 +11,10 @@ import warnings
 
 from . import core
 from .core import *
+
+# bring
+from .core.read import read_fid, read_fdf
+
 # setting global constants not accessible at config
 DTYPE='complex64'
 
