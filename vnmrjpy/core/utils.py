@@ -11,7 +11,7 @@ Functions:
     vprint -- print if verbose is True
     savepd -- save procpar dictionary to json
     loadpd -- load procpar dictionary from json
-    set_procpar -- modify parameter value in procpar file
+    change_procpar -- modify parameter value in procpar file
 
 Classes:
     FitViewer3D -- view 4D volume along with best fit on time axis
@@ -31,13 +31,15 @@ def getpetab(pd):
 
     pass 
 
-def set_procpar(path, par, val):
+def change_procpar(path, par, val, newfile=None):
     """Rewrite procpar parameter in file to the desired value
 
     Args:
         path -- path to .fid direcory od procpar file
         par -- parameter name, can be a list
         val -- desired value, format should be correct, can be a list
+        newfile -- save as new file in same directory, if None, procpar is
+                    overwritten
     Return:
         None
     """
@@ -51,7 +53,6 @@ def set_procpar(path, par, val):
         par = [par]
         val = [val]
     par = [str(i) for i in par]
-    val = [str(i) for i]
     if path[-4:] == '.fid':  # path was fid directory
         ppfile = path+'/procpar'
     elif path[-7:] == 'procpar':
@@ -72,26 +73,28 @@ def set_procpar(path, par, val):
                 for i in par:
                     if line.startswith(i):
                         curpar = i
-                        curval = par.index(i)
+                        curval = val[par.index(i)]
                 line_nums.append(num)
                 par_order.append(curpar)
                 val_order.append(curval)
-    print(par_order)
-    print(line_nums)             
     # change lines
     for num, line in enumerate(lines):
         if num in line_nums:
             if lines[num+1].startswith('1'):
-                print(num)
-                print(lines[num+1])
                 # check value type
                 ind = line_nums.index(num)
-                lines[num+1] = '1 '+val_order[ind]
+                if type(val_order[ind]) == str:
+                    lines[num+1] = '1 "'+val_order[ind]+'"\n'
+                else:
+                    lines[num+1] = '1 '+str(val_order[ind])+'\n'
             else:
                 raise Exception('Unexpected start of line '+str(num+1))
 
     # writing file
-    newppfile = ppfile.rsplit('/',1)[0]+'/test' 
+    if newfile == None:
+        newppfile = ppfile 
+    else:
+        newppfile = ppfile.rsplit('/',1)[0]+'/'+newfile
     with open(newppfile,'w') as openpp:
         openpp.writelines(lines)
     # restore permissions

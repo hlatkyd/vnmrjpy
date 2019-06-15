@@ -145,30 +145,7 @@ class varray():
         NOW:
                 ([phase, read, slice, echo*time, rcvrs])
         """
-        # if data is not from fid, just fft it
-        if self.vdtype == 'imagespace':
-            raise(Exception('not implemented yet'))        
-            #TODO something like this:
-
-            #self.data = vj.core.recon._fft(self.data,dims)
-            #self.vdype = 'kspace'                
-
-        # check if data is really from fid
-        if self.vdtype is not 'fid':
-            raise(Exception('varray data is not fid data.'))
-        self.data = np.vectorize(complex)(self.data[:,0::2],\
-                                                self.data[:,1::2])
-        # check for arrayed parameters, save the length for later 
-        array_length = reduce(lambda x,y: x*y, \
-                        [i[1] for i in self.arrayed_params])
-        blocks = self.data.shape[0] // array_length
-        vprint('Making k-space for '+ str(self.apptype)+' '\
-                +str(self.pd['seqfil'])+' seqcon: '+str(self.pd['seqcon']))
-        rcvrs = self.pd['rcvrs'].count('y')
-
-        # add epiref
-        self.epiref_type = epiref_type
-
+        # ====================== Child functions, helpers======================
         def _is_interleaved(ppdict):
             res  = (int(ppdict['sliceorder']) == 1)
             return res
@@ -562,20 +539,45 @@ class varray():
 
         def make_im3Dute():
             raise(Exception('not implemented')) 
+
+        # ========================== INIT =====================================
+        # if data is not from fid, just fft it
+        if self.vdtype == 'imagespace':
+            raise(Exception('not implemented yet'))        
+            #TODO something like this:
+
+            #self.data = vj.core.recon._fft(self.data,dims)
+            #self.vdype = 'kspace'                
+
         #=========================== Xrecon ===================================
         vprint(' making seqfil : {}'.format(self.pd['seqfil']))
 
         if method == 'xrecon':
-            vj.xrecon.check_procpar()
-            try:
-                vj.xrecon.call()
-            except:
-                raise Exception('Xrecon could not process fid')
-            vj.xrecon.read_fdf()
+            self = vj.xrecon.make_temp_dir(self)
+            self = vj.xrecon.mod_procpar(self,output='kspace')
+            self = vj.xrecon.call(self)
+            self = vj.xrecon.loadfdf(self)
+            self = vj.xrecon.clean(self)
             return self
 
         # ========================= Vnmrjpy recon ============================
         elif method == 'vnmrjpy':
+
+            # check if data is really from fid
+            if self.vdtype is not 'fid':
+                raise(Exception('varray data is not fid data.'))
+            self.data = np.vectorize(complex)(self.data[:,0::2],\
+                                                    self.data[:,1::2])
+            # check for arrayed parameters, save the length for later 
+            array_length = reduce(lambda x,y: x*y, \
+                            [i[1] for i in self.arrayed_params])
+            blocks = self.data.shape[0] // array_length
+            vprint('Making k-space for '+ str(self.apptype)+' '\
+                    +str(self.pd['seqfil'])+' seqcon: '+str(self.pd['seqcon']))
+            rcvrs = self.pd['rcvrs'].count('y')
+
+            # add epiref
+            self.epiref_type = epiref_type
             # ----------------Handle sequence exceptions first---------------------
 
 
