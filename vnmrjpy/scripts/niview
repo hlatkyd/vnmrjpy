@@ -24,7 +24,8 @@ class Niview():
     def __init__(self, nifti=None, img=None,to_anatomical=True,\
                 fid=None, showkspace=False, ch=None, addch=True,\
                 absolute=True, magn=False, phase=False,\
-                imag=False, real=False):  # fid options
+                imag=False, real=False,\
+                xrecon=False):
 
 
         if nifti is not None:
@@ -40,14 +41,28 @@ class Niview():
 
             self.data = varr.data
             self.affine = varr.nifti_header.get_qform()
+
         elif fid is not None:
+            # get absolute path
+            if not fid.startswith('/'):
+                fid = os.getcwd()+'/'+fid
             # reading fid gets more options:
-            varr = vj.core.read_fid(fid)
-            varr.to_kspace()
+            # reading and reconstructiong data-----------------------------
+            if xrecon == False:
+                varr = vj.core.read_fid(fid)
+                varr.to_kspace()
+            elif xrecon == True:
+                if not showkspace:
+                    xrsp = 'imagespace'
+                else:
+                    xrsp = 'kspace'
+                varr = vj.core.read_fid(fid,xrecon=True,xrecon_space=xrsp)
+    
             if to_anatomical:
                 varr.to_anatomical()
             self.affine = varr.nifti_header.get_qform()
-
+            
+            # showing data--------------------------------------------------
             # show kspace
             if showkspace == True:
             
@@ -65,7 +80,8 @@ class Niview():
 
             # show image space
             else:
-                data5d = varr.to_imagespace().data
+                if xrecon == False:
+                    data5d = varr.to_imagespace().data
 
                 # plot absolute values
                 if absolute == True:
@@ -121,6 +137,7 @@ if __name__ == '__main__':
     parser.add_argument('--phase',action='store_true')
     parser.add_argument('--magn',action='store_true')
     parser.add_argument('--kspace',action='store_true')
+    parser.add_argument('--xrecon',action='store_true')
     args = parser.parse_args()
     if str(args.nifti).endswith('.nii') or \
         str(args.nifti).endswith('.nii.gz'):
@@ -142,18 +159,20 @@ if __name__ == '__main__':
         if args.kspace:
             if args.phase:
                 nv = Niview(fid=str(args.nifti),phase=args.phase,\
-                    absolute=False,showkspace=True)
+                    absolute=False,showkspace=True,xrecon=args.xrecon)
                 nv.interactiveplot()
             else:
-                nv = Niview(fid=str(args.nifti),absolute=True,showkspace=True)
+                nv = Niview(fid=str(args.nifti),absolute=True,showkspace=True,\
+                            xrecon=args.xrecon)
                 nv.interactiveplot()
         else:
             if args.phase:
                 nv = Niview(fid=str(args.nifti),phase=args.phase,\
-                    absolute=False)
+                    absolute=False,xrecon=args.xrecon)
                 nv.interactiveplot()
             else:
-                nv = Niview(fid=str(args.nifti),absolute=True)
+                nv = Niview(fid=str(args.nifti),absolute=True,\
+                            xrecon=args.xrecon)
                 nv.interactiveplot()
     else:
         print('Wrong input: not a .nii/.fid/.img file or dir')

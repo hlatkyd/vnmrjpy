@@ -91,13 +91,16 @@ def read_procpar(procpar):
 
     return dict(zip(name, value))
 
-def read_fid(fid,procpar=None,load_data=True):
+def read_fid(fid,procpar=None,load_data=True,
+            xrecon=False,xrecon_space='imagespace'):
     """Handles raw data from Varian spectrometer
 
     Args:
         fid -- path to .fid directory
         procpar -- path to procpar file, specify procpar manually
         load_data -- set false to prevent loading binary data into memory
+        xrecon -- Set True for direct reconstruction by Xrecon
+        xrecon_space -- either 'kspace' or 'imagespace' for xrecon output
 
     .fid File structure as per Vnmrj manual:
     ===================================
@@ -127,7 +130,6 @@ def read_fid(fid,procpar=None,load_data=True):
        float   lvl;        /* F2 level drift correction       
        float   tlt;        /* F2 tilt drift correction      
     """
-
     def _decode_header(bheader):
         """Return dictionary of fid header from binary header data"""
         hkey_list = ['nblocks','ntraces','np','ebytes','tbytes','bbytes',\
@@ -177,7 +179,16 @@ def read_fid(fid,procpar=None,load_data=True):
         for i in range(0, len(l), n):
             yield l[i:i + n]
 
-    # init
+    def _xrecon_read(varr,xrspace):
+    
+        varr = vj.xrecon.make_temp_dir(varr)
+        varr = vj.xrecon.mod_procpar(varr,output=xrspace)
+        varr = vj.xrecon.call(varr)
+        varr = vj.xrecon.loadfdf(varr,data=xrspace)
+        varr = vj.xrecon.clean(varr)
+        return varr
+
+    # ============================ INIT =======================================
     # TODO is procpar != None making sense?
     if procpar==None:
     
@@ -188,7 +199,38 @@ def read_fid(fid,procpar=None,load_data=True):
         else:
             fid_path = fid.rsplit('/',1)[0]
             procpar = fid.rsplit('/')[0]+'/procpar'
+    else:
+        print('Warning: manual setting of procpar is not fully supported')
+    # ============================ XRECON ====================================
+    # deal with Xrecon is set True
+    if xrecon == True:
+        
+        pd = read_procpar(procpar)
+        arr = _get_arrayed_par_length(pd)
+        # TODO ???
+        sdim = ['phase', 'read', 'slice', 'time', 'rcvr']
 
+        if xrecon_space == 'kspace':
+            vdtype = 'kspace'
+        elif xrecon_space == 'imagespace':
+            vdtype = 'imagespace'
+
+        varr = vj.varray(data=None,space=None,\
+                        pd=pd,fid_header=None,\
+                        source='fid',dtype=vj.DTYPE, seqcon=pd['seqcon'],\
+                        apptype=pd['apptype'],arrayed_params=arr,\
+                        vdtype=None,sdims = sdim, fid_path=fid_path)
+
+        varr = _xrecon_read(varr,xrecon_space)
+
+        varr.vdtype = vdtype
+        varr.set_nifti_header()
+        varr.to_local()
+
+        return varr
+
+
+    # ================================ VNMRJPY ================================
     # header data should be 32 bytes
     with open(fid,'rb') as openFid:
         binary_data = openFid.read()
@@ -231,10 +273,11 @@ def read_fid(fid,procpar=None,load_data=True):
     # fid data ready, now create varray class
     arr = _get_arrayed_par_length(pd)
     sdim = ['phase', 'read', 'slice', 'time', 'rcvr']
-    return  vj.varray(data=fid_data,space=None,pd=pd,fid_header=header_dict,\
+    varr = vj.varray(data=fid_data,space=None,pd=pd,fid_header=header_dict,\
                         source='fid',dtype=vj.DTYPE, seqcon=pd['seqcon'],\
                         apptype=pd['apptype'],arrayed_params=arr,vdtype='fid',\
                         sdims = sdim, fid_path=fid_path)
+    return varr
 
 def read_fdf(path):
     """Return vnmrjpy.varray from varian .fdf files
@@ -299,11 +342,11 @@ def read_fdf(path):
                     header_dict[item] = tuple([k \
                                     for k in tempval.split(',')])
                 if item == 'matrix':            
-                    tempval = header_dict[item][1:-1];''.join(tempval)                
+                    tempval = header_dict[item][1:-1];''.join(tempval)
                     header_dict[item] = tuple([int(k) \
                                     for k in tempval.split(',')])
                 if item == 'roi':
-                    tempval = header_dict[item][1:-1];''.join(tempval)                
+                    tempval = header_dict[item][1:-1];''.join(tempval)
                     header_dict[item] = tuple([float(k)\
                                     for k in tempval.split(',')])
                 if item == 'ro_size' or item == 'pe_size' \
@@ -314,11 +357,11 @@ def read_fdf(path):
                     tempval = tempval.replace('"','')
                     header_dict[item] = str(tempval)
                 if item == 'orientation':
-                    tempval = header_dict[item][1:-1];''.join(tempval)                
+                    tempval = header_dict[item][1:-1];''.join(tempval)
                     header_dict[item] = tuple([float(k)\
                                     for k in tempval.split(',')])
                 if item == 'location':
-                    tempval = header_dict[item][1:-1];''.join(tempval)                
+                    tempval = header_dict[item][1:-1];''.join(tempval)
                     header_dict[item] = tuple([float(k)\
                                     for k in tempval.split(',')])
                 if item == 'gap':
@@ -374,9 +417,11 @@ def read_fdf(path):
                             
             (header, data) = _preproc_fdf(i)
             img_data = _prepare_data(data, header_dict)
+            # expand to time dim
+            img_data = np.expand_dims(img_data,axis=3)
             full_data.append(img_data) # full data in one list
 
-        data_array = np.asarray(full_data)
+        data_array = np.concatenate(full_data,axis=3)
 
     #----------------------process if 2d-------------------------
     elif header_dict['spatial_rank'] == '"2dfov"':

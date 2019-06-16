@@ -11,4 +11,10 @@ class Test_Xrecon(unittest.TestCase):
         varr = vj.read_fid(fid,load_data=False)
         varr.to_kspace(method='xrecon')
         self.assertEqual(varr.pd['rawIM'],'y')
-        print(varr.data.shape)
+        
+
+    def test_xrecon_read_fid(self):
+        fid = glob.glob(vj.config['dataset_dir']+'/xrecontest/gems*')[0]
+        varr = vj.read_fid(fid,xrecon=True,xrecon_space='imagespace')
+        self.assertEqual(varr.data.shape,(128,128,20,1,4))
+        self.assertEqual(varr.vdtype,'imagespace')

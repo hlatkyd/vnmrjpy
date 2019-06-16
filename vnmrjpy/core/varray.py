@@ -663,13 +663,16 @@ class varray():
             method -- set either 'xrecon' or 'vnmrjpy'
         Updates attributes:
             data
-            
-
         """
         # ========================== call Xrecon ==============================
         if method == 'xrecon':
         
-            pass
+            self = vj.xrecon.make_temp_dir(self)
+            self = vj.xrecon.mod_procpar(self,output='imagespace')
+            self = vj.xrecon.call(self)
+            self = vj.xrecon.loadfdf(self)
+            self = vj.xrecon.clean(self)
+            return self
 
         # =========================== Vnmrjpy custom fft ======================
         elif method == 'vnmrjpy':

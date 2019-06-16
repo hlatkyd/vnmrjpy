@@ -23,12 +23,7 @@ Xrecon specific parameters are stored in varray.xrp attribute, which is a
 dictionary.
 
 """
-
-def xrecon_fid(fid, data='kspace',space='anatomical'):
-    """Read fid into a varray with Xrecon reconstruction
-
-    """
-    pass
+#TODO maybe an orientation correction is needed for xrecon-made data?
 
 def make_temp_dir(varr):
     """Make a temp directory and symbolic links with the fid files"""
@@ -106,8 +101,8 @@ def loadfdf(varr, data='kspace', save_files=False):
         img_IM = sorted([i for i in img_list if 'rawIM' in i])
         img_RE = sorted([i for i in img_list if 'rawRE' in i])
     elif data == 'imagespace':
-        img_IM = sorted([i for i in img_list if 'imIM' in i])
-        img_RE = sorted([i for i in img_list if 'imRE' in i])
+        img_IM = sorted([i for i in img_list if 'reconIM' in i])
+        img_RE = sorted([i for i in img_list if 'reconRE' in i])
     dataIM = []
     dataRE = []
     for rcvr in range(len(img_RE)):
@@ -123,8 +118,13 @@ def loadfdf(varr, data='kspace', save_files=False):
         im = vj.read_fdf(img_IM[rcvr]).data
         fulldata[...,rcvr] = np.vectorize(complex)(re,im)
 
+    # TODO fix this maybe?? 
+    # changing read and phase dims for consistency with others
+    np.swapaxes(fulldata,0,1)
+
     os.chdir(varr.xrp['origdir'])
     varr.data = fulldata
+    varr.vdtype = data
     
     return varr
 
